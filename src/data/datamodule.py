@@ -48,9 +48,12 @@ class TextDataset(Dataset):
             )
 
             # Create sliding windows
-            for i in range(0, len(token_ids) - self.max_length + 1, self.stride):
+            if len(token_ids) < 2:  # Need at least 2 tokens for input and label
+                continue
+
+            for i in range(0, len(token_ids) - 1, self.stride):
                 window = token_ids[i : i + self.max_length]
-                if len(window) == self.max_length:
+                if len(window) >= 2:  # Need at least input and label
                     samples.append(
                         {
                             "input_ids": window[:-1],  # Input is all but last token

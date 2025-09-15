@@ -43,6 +43,9 @@ class CharacterTokenizer:
             self.eos_token,
             self.bos_token,
         ]
+
+        # Ensure special tokens are not duplicated in regular chars
+        chars = chars - set(special_tokens)
         all_chars = special_tokens + sorted(list(chars))
 
         self.char_to_idx = {char: idx for idx, char in enumerate(all_chars)}

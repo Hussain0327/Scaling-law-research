@@ -101,7 +101,12 @@ class TestTrainer:
 
         # Test warmup schedule
         assert trainer.warmup_lr(0) == 0.0
-        assert trainer.warmup_lr(trainer.warmup_steps // 2) == trainer.learning_rate / 2
+        # Test at step 1 out of 5 warmup steps
+        expected_lr_at_1 = trainer.learning_rate * 1 / trainer.warmup_steps
+        assert abs(trainer.warmup_lr(1) - expected_lr_at_1) < 1e-6
+        # Test at step 3 out of 5 warmup steps
+        expected_lr_at_3 = trainer.learning_rate * 3 / trainer.warmup_steps
+        assert abs(trainer.warmup_lr(3) - expected_lr_at_3) < 1e-6
         assert trainer.warmup_lr(trainer.warmup_steps) == trainer.learning_rate
 
     def test_train_step(self, minimal_config, mock_dataloaders):
@@ -139,8 +144,7 @@ class TestTrainer:
                     param, initial_params[name]
                 ), f"Parameter {name} was not updated"
 
-    @patch("torch.no_grad")
-    def test_evaluate(self, mock_no_grad, minimal_config, mock_dataloaders):
+    def test_evaluate(self, minimal_config, mock_dataloaders):
         """Test evaluation function."""
         model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
@@ -152,10 +156,6 @@ class TestTrainer:
             config=minimal_config,
             use_wandb=False,
         )
-
-        # Mock torch.no_grad context manager
-        mock_no_grad.return_value.__enter__ = MagicMock()
-        mock_no_grad.return_value.__exit__ = MagicMock()
 
         metrics = trainer.evaluate()
 

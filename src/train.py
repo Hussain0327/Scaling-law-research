@@ -308,13 +308,6 @@ class Trainer:
         }
 
 
-def load_config(config_path: str) -> Dict[str, Any]:
-    """Load configuration from YAML file."""
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
-
-
 def setup_experiment(config: Dict[str, Any]) -> Tuple[TinyGPT, DataLoader, DataLoader]:
     """Set up model and data for experiment."""
     # Create model

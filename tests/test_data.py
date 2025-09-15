@@ -37,7 +37,10 @@ class TestCharacterTokenizer:
         tokenizer.build_vocab(texts)
 
         # Check that all characters are in vocabulary
-        expected_chars = set("helloworld test")
+        expected_chars = set()
+        for text in texts:
+            expected_chars.update(text)
+
         for char in expected_chars:
             assert char in tokenizer.char_to_idx
 
@@ -290,7 +293,7 @@ class TestTinyStoriesDataModule:
         assert datamodule.max_length == 128
         assert datamodule.batch_size == 16
 
-    @patch("datasets.load_dataset")
+    @patch("data.datamodule.load_dataset")
     def test_prepare_data_with_fraction(self, mock_load_dataset):
         """Test data preparation with data fraction."""
         # Mock dataset
@@ -329,7 +332,7 @@ class TestTinyStoriesDataModule:
         assert isinstance(datamodule.tokenizer, CharacterTokenizer)
         assert datamodule.tokenizer.vocab_size > 0
 
-    @patch("data.tokenizers.create_tokenizer")
+    @patch("data.datamodule.create_tokenizer")
     def test_setup_subword_tokenizer(self, mock_create_tokenizer):
         """Test subword tokenizer setup."""
         mock_tokenizer = MagicMock()
