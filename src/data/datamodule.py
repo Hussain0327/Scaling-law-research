@@ -5,15 +5,21 @@ Supports TinyStories and other text datasets.
 
 import json
 import random
-from typing import List, Dict, Any, Optional, Union, Tuple
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-import torch
-from torch.utils.data import Dataset, DataLoader
-from datasets import load_dataset, Dataset as HFDataset
 import numpy as np
+import torch
+from datasets import Dataset as HFDataset
+from datasets import load_dataset
+from torch.utils.data import DataLoader, Dataset
 
-from .tokenizers import create_tokenizer, collate_fn, CharacterTokenizer, SubwordTokenizer
+from .tokenizers import (
+    CharacterTokenizer,
+    SubwordTokenizer,
+    collate_fn,
+    create_tokenizer,
+)
 
 
 class TextDataset(Dataset):
@@ -25,7 +31,7 @@ class TextDataset(Dataset):
         tokenizer: Union[CharacterTokenizer, SubwordTokenizer],
         max_length: int = 256,
         stride: int = 128,
-        add_special_tokens: bool = True
+        add_special_tokens: bool = True,
     ):
         self.texts = texts
         self.tokenizer = tokenizer
@@ -42,16 +48,20 @@ class TextDataset(Dataset):
 
         for text in self.texts:
             # Tokenize the full text
-            token_ids = self.tokenizer.encode(text, add_special_tokens=self.add_special_tokens)
+            token_ids = self.tokenizer.encode(
+                text, add_special_tokens=self.add_special_tokens
+            )
 
             # Create sliding windows
             for i in range(0, len(token_ids) - self.max_length + 1, self.stride):
-                window = token_ids[i:i + self.max_length]
+                window = token_ids[i : i + self.max_length]
                 if len(window) == self.max_length:
-                    samples.append({
-                        'input_ids': window[:-1],  # Input is all but last token
-                        'labels': window[1:]       # Labels are shifted by one
-                    })
+                    samples.append(
+                        {
+                            "input_ids": window[:-1],  # Input is all but last token
+                            "labels": window[1:],  # Labels are shifted by one
+                        }
+                    )
 
         return samples
 
@@ -74,7 +84,7 @@ class TinyStoriesDataModule:
         num_workers: int = 4,
         max_samples: Optional[int] = None,
         data_fraction: float = 1.0,
-        seed: int = 42
+        seed: int = 42,
     ):
         self.tokenizer_type = tokenizer_type
         self.max_length = max_length
@@ -98,19 +108,19 @@ class TinyStoriesDataModule:
 
         # Take subset of data if requested
         if self.data_fraction < 1.0:
-            train_size = int(len(dataset['train']) * self.data_fraction)
-            val_size = int(len(dataset['validation']) * self.data_fraction)
+            train_size = int(len(dataset["train"]) * self.data_fraction)
+            val_size = int(len(dataset["validation"]) * self.data_fraction)
 
-            dataset['train'] = dataset['train'].select(range(train_size))
-            dataset['validation'] = dataset['validation'].select(range(val_size))
+            dataset["train"] = dataset["train"].select(range(train_size))
+            dataset["validation"] = dataset["validation"].select(range(val_size))
 
         # Limit number of samples if specified
         if self.max_samples:
-            train_samples = min(self.max_samples, len(dataset['train']))
-            val_samples = min(self.max_samples // 10, len(dataset['validation']))
+            train_samples = min(self.max_samples, len(dataset["train"]))
+            val_samples = min(self.max_samples // 10, len(dataset["validation"]))
 
-            dataset['train'] = dataset['train'].select(range(train_samples))
-            dataset['validation'] = dataset['validation'].select(range(val_samples))
+            dataset["train"] = dataset["train"].select(range(train_samples))
+            dataset["validation"] = dataset["validation"].select(range(val_samples))
 
         self.raw_dataset = dataset
 
@@ -124,9 +134,9 @@ class TinyStoriesDataModule:
         if self.tokenizer_type == "char":
             # Build character vocabulary
             texts = []
-            for split in ['train', 'validation']:
+            for split in ["train", "validation"]:
                 for item in self.raw_dataset[split]:
-                    texts.append(item['text'])
+                    texts.append(item["text"])
                     if len(texts) >= 10000:  # Sample for vocab building
                         break
 
@@ -149,8 +159,8 @@ class TinyStoriesDataModule:
         print("Creating datasets...")
 
         # Extract texts
-        train_texts = [item['text'] for item in self.raw_dataset['train']]
-        val_texts = [item['text'] for item in self.raw_dataset['validation']]
+        train_texts = [item["text"] for item in self.raw_dataset["train"]]
+        val_texts = [item["text"] for item in self.raw_dataset["validation"]]
 
         # Create datasets
         self.train_dataset = TextDataset(
@@ -174,7 +184,7 @@ class TinyStoriesDataModule:
             shuffle=True,
             num_workers=self.num_workers,
             collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id),
-            pin_memory=True
+            pin_memory=True,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -185,7 +195,7 @@ class TinyStoriesDataModule:
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id),
-            pin_memory=True
+            pin_memory=True,
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -196,16 +206,18 @@ class TinyStoriesDataModule:
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id),
-            pin_memory=True
+            pin_memory=True,
         )
 
     def get_sample_text(self, num_samples: int = 5) -> List[str]:
         """Get sample texts for inspection."""
         samples = []
-        for i, item in enumerate(self.raw_dataset['train']):
+        for i, item in enumerate(self.raw_dataset["train"]):
             if i >= num_samples:
                 break
-            samples.append(item['text'][:200] + "..." if len(item['text']) > 200 else item['text'])
+            samples.append(
+                item["text"][:200] + "..." if len(item["text"]) > 200 else item["text"]
+            )
         return samples
 
 
@@ -222,7 +234,7 @@ class SimpleTextDataModule:
         batch_size: int = 32,
         num_workers: int = 4,
         val_split: float = 0.1,
-        seed: int = 42
+        seed: int = 42,
     ):
         self.train_file = train_file
         self.val_file = val_file
@@ -240,11 +252,11 @@ class SimpleTextDataModule:
 
     def load_text_file(self, file_path: str) -> List[str]:
         """Load text from file."""
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             text = f.read()
 
         # Split into sentences or paragraphs
-        sentences = text.split('\n')
+        sentences = text.split("\n")
         sentences = [s.strip() for s in sentences if s.strip()]
         return sentences
 
@@ -302,7 +314,7 @@ class SimpleTextDataModule:
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id)
+            collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id),
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -311,11 +323,13 @@ class SimpleTextDataModule:
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id)
+            collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id),
         )
 
 
-def create_datamodule(dataset_name: str, **kwargs) -> Union[TinyStoriesDataModule, SimpleTextDataModule]:
+def create_datamodule(
+    dataset_name: str, **kwargs
+) -> Union[TinyStoriesDataModule, SimpleTextDataModule]:
     """
     Factory function to create data modules.
 
@@ -341,7 +355,7 @@ def get_dataset_stats(dataloader: DataLoader) -> Dict[str, Any]:
     seq_lengths = []
 
     for batch in dataloader:
-        input_ids = batch['input_ids']
+        input_ids = batch["input_ids"]
         batch_size, seq_len = input_ids.shape
 
         total_samples += batch_size
@@ -349,9 +363,9 @@ def get_dataset_stats(dataloader: DataLoader) -> Dict[str, Any]:
         seq_lengths.extend([seq_len] * batch_size)
 
     return {
-        'total_samples': total_samples,
-        'total_tokens': total_tokens,
-        'avg_tokens_per_sample': total_tokens / total_samples,
-        'max_seq_length': max(seq_lengths),
-        'min_seq_length': min(seq_lengths)
+        "total_samples": total_samples,
+        "total_tokens": total_tokens,
+        "avg_tokens_per_sample": total_tokens / total_samples,
+        "max_seq_length": max(seq_lengths),
+        "min_seq_length": min(seq_lengths),
     }

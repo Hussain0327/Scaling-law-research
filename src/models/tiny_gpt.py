@@ -4,10 +4,11 @@ Implements transformer architecture with multi-head attention, MLP blocks, and l
 """
 
 import math
+from typing import Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, Tuple
 
 
 class MultiHeadAttention(nn.Module):
@@ -33,9 +34,21 @@ class MultiHeadAttention(nn.Module):
         batch_size, seq_len, d_model = x.shape
 
         # Linear projections
-        q = self.q_proj(x).view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
-        k = self.k_proj(x).view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
-        v = self.v_proj(x).view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
+        q = (
+            self.q_proj(x)
+            .view(batch_size, seq_len, self.n_heads, self.d_k)
+            .transpose(1, 2)
+        )
+        k = (
+            self.k_proj(x)
+            .view(batch_size, seq_len, self.n_heads, self.d_k)
+            .transpose(1, 2)
+        )
+        v = (
+            self.v_proj(x)
+            .view(batch_size, seq_len, self.n_heads, self.d_k)
+            .transpose(1, 2)
+        )
 
         # Scaled dot-product attention with causal mask
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)
@@ -45,7 +58,7 @@ class MultiHeadAttention(nn.Module):
             mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
             self.register_buffer("causal_mask", mask)
 
-        scores = scores.masked_fill(self.causal_mask[:seq_len, :seq_len], float('-inf'))
+        scores = scores.masked_fill(self.causal_mask[:seq_len, :seq_len], float("-inf"))
         attn_weights = F.softmax(scores, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
@@ -129,10 +142,9 @@ class TinyGPT(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # Transformer blocks
-        self.blocks = nn.ModuleList([
-            TransformerBlock(d_model, n_heads, d_ff, dropout)
-            for _ in range(n_layers)
-        ])
+        self.blocks = nn.ModuleList(
+            [TransformerBlock(d_model, n_heads, d_ff, dropout) for _ in range(n_layers)]
+        )
 
         # Output layer
         self.ln_final = nn.LayerNorm(d_model)
@@ -157,9 +169,7 @@ class TinyGPT(nn.Module):
             torch.nn.init.ones_(module.weight)
 
     def forward(
-        self,
-        input_ids: torch.Tensor,
-        targets: Optional[torch.Tensor] = None
+        self, input_ids: torch.Tensor, targets: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """
         Forward pass.
@@ -173,7 +183,9 @@ class TinyGPT(nn.Module):
             loss: Cross-entropy loss if targets provided
         """
         batch_size, seq_len = input_ids.shape
-        assert seq_len <= self.max_seq_len, f"Sequence length {seq_len} exceeds maximum {self.max_seq_len}"
+        assert (
+            seq_len <= self.max_seq_len
+        ), f"Sequence length {seq_len} exceeds maximum {self.max_seq_len}"
 
         # Create position indices
         pos_ids = torch.arange(seq_len, device=input_ids.device).unsqueeze(0)
@@ -199,7 +211,7 @@ class TinyGPT(nn.Module):
             loss = F.cross_entropy(
                 shift_logits.view(-1, shift_logits.size(-1)),
                 shift_labels.view(-1),
-                ignore_index=-100
+                ignore_index=-100,
             )
 
         return logits, loss
@@ -210,7 +222,7 @@ class TinyGPT(nn.Module):
         max_new_tokens: int = 100,
         temperature: float = 1.0,
         top_k: Optional[int] = None,
-        do_sample: bool = True
+        do_sample: bool = True,
     ) -> torch.Tensor:
         """
         Generate text autoregressively.
@@ -231,7 +243,7 @@ class TinyGPT(nn.Module):
         with torch.no_grad():
             for _ in range(max_new_tokens):
                 # Get last max_seq_len tokens if sequence is too long
-                input_seq = generated[:, -self.max_seq_len:]
+                input_seq = generated[:, -self.max_seq_len :]
 
                 # Forward pass
                 logits, _ = self.forward(input_seq)
@@ -240,7 +252,7 @@ class TinyGPT(nn.Module):
                 # Apply top-k filtering
                 if top_k is not None:
                     v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                    logits[logits < v[:, [-1]]] = -float('inf')
+                    logits[logits < v[:, [-1]]] = -float("inf")
 
                 # Sample next token
                 if do_sample:
@@ -262,7 +274,7 @@ class TinyGPT(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     @classmethod
-    def from_config(cls, config: dict) -> 'TinyGPT':
+    def from_config(cls, config: dict) -> "TinyGPT":
         """Create model from configuration dictionary."""
         return cls(**config)
 
@@ -273,7 +285,7 @@ def create_tiny_gpt(
     n_layers: int = 6,
     n_heads: int = 8,
     max_seq_len: int = 256,
-    dropout: float = 0.1
+    dropout: float = 0.1,
 ) -> TinyGPT:
     """Convenience function to create a TinyGPT model with default parameters."""
     return TinyGPT(
@@ -282,5 +294,5 @@ def create_tiny_gpt(
         n_layers=n_layers,
         n_heads=n_heads,
         max_seq_len=max_seq_len,
-        dropout=dropout
+        dropout=dropout,
     )

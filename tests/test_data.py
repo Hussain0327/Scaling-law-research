@@ -2,18 +2,29 @@
 Unit tests for data loading and tokenization modules.
 """
 
+import json
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pytest
 import torch
-import tempfile
-import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-import sys
-sys.path.append('src')
+sys.path.append("src")
 
-from data.tokenizers import CharacterTokenizer, SubwordTokenizer, create_tokenizer, collate_fn
-from data.datamodule import TextDataset, TinyStoriesDataModule, SimpleTextDataModule, create_datamodule
+from data.datamodule import (
+    SimpleTextDataModule,
+    TextDataset,
+    TinyStoriesDataModule,
+    create_datamodule,
+)
+from data.tokenizers import (
+    CharacterTokenizer,
+    SubwordTokenizer,
+    collate_fn,
+    create_tokenizer,
+)
 
 
 class TestCharacterTokenizer:
@@ -81,7 +92,7 @@ class TestCharacterTokenizer:
         texts = ["hello world"]
         tokenizer.build_vocab(texts)
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -119,7 +130,7 @@ class TestCharacterTokenizer:
 class TestSubwordTokenizer:
     """Test subword tokenizer wrapper."""
 
-    @patch('transformers.GPT2TokenizerFast.from_pretrained')
+    @patch("transformers.GPT2TokenizerFast.from_pretrained")
     def test_initialization(self, mock_from_pretrained):
         """Test tokenizer initialization."""
         mock_tokenizer = MagicMock()
@@ -133,7 +144,7 @@ class TestSubwordTokenizer:
         assert tokenizer.vocab_size == 1000
         assert tokenizer.tokenizer.pad_token == tokenizer.tokenizer.eos_token
 
-    @patch('transformers.GPT2TokenizerFast.from_pretrained')
+    @patch("transformers.GPT2TokenizerFast.from_pretrained")
     def test_encode_decode(self, mock_from_pretrained):
         """Test encoding and decoding."""
         mock_tokenizer = MagicMock()
@@ -179,7 +190,7 @@ class TestTextDataset:
             tokenizer=tokenizer,
             max_length=4,
             stride=2,
-            add_special_tokens=False
+            add_special_tokens=False,
         )
 
         # Check that samples are created correctly
@@ -187,10 +198,10 @@ class TestTextDataset:
 
         # Check sample format
         sample = dataset[0]
-        assert 'input_ids' in sample
-        assert 'labels' in sample
-        assert len(sample['input_ids']) == 3  # max_length - 1
-        assert len(sample['labels']) == 3
+        assert "input_ids" in sample
+        assert "labels" in sample
+        assert len(sample["input_ids"]) == 3  # max_length - 1
+        assert len(sample["labels"]) == 3
 
     def test_dataset_with_special_tokens(self):
         """Test dataset with special tokens."""
@@ -203,7 +214,7 @@ class TestTextDataset:
             tokenizer=tokenizer,
             max_length=10,
             stride=5,
-            add_special_tokens=True
+            add_special_tokens=True,
         )
 
         assert len(dataset) > 0
@@ -214,12 +225,7 @@ class TestTextDataset:
         texts = ["hello"]
         tokenizer.build_vocab(texts)
 
-        dataset = TextDataset(
-            texts=[],
-            tokenizer=tokenizer,
-            max_length=10,
-            stride=5
-        )
+        dataset = TextDataset(texts=[], tokenizer=tokenizer, max_length=10, stride=5)
 
         assert len(dataset) == 0
 
@@ -230,68 +236,62 @@ class TestCollateFunction:
     def test_collate_input_ids_only(self):
         """Test collation with input_ids only."""
         batch = [
-            {'input_ids': [1, 2, 3]},
-            {'input_ids': [4, 5]},
-            {'input_ids': [6, 7, 8, 9]}
+            {"input_ids": [1, 2, 3]},
+            {"input_ids": [4, 5]},
+            {"input_ids": [6, 7, 8, 9]},
         ]
 
         collated = collate_fn(batch, pad_token_id=0)
 
         # Check shape
-        assert collated['input_ids'].shape == (3, 4)  # batch_size=3, max_len=4
+        assert collated["input_ids"].shape == (3, 4)  # batch_size=3, max_len=4
 
         # Check padding
-        assert collated['input_ids'][1, 2].item() == 0  # Second sequence padded
-        assert collated['input_ids'][1, 3].item() == 0
+        assert collated["input_ids"][1, 2].item() == 0  # Second sequence padded
+        assert collated["input_ids"][1, 3].item() == 0
 
     def test_collate_with_labels(self):
         """Test collation with labels."""
         batch = [
-            {'input_ids': [1, 2, 3], 'labels': [2, 3, 4]},
-            {'input_ids': [4, 5], 'labels': [5, 6]}
+            {"input_ids": [1, 2, 3], "labels": [2, 3, 4]},
+            {"input_ids": [4, 5], "labels": [5, 6]},
         ]
 
         collated = collate_fn(batch, pad_token_id=0)
 
-        assert 'input_ids' in collated
-        assert 'labels' in collated
-        assert collated['input_ids'].shape == collated['labels'].shape
+        assert "input_ids" in collated
+        assert "labels" in collated
+        assert collated["input_ids"].shape == collated["labels"].shape
 
         # Check that labels are padded with -100
-        assert collated['labels'][1, 2].item() == -100
+        assert collated["labels"][1, 2].item() == -100
 
     def test_collate_same_length_sequences(self):
         """Test collation when all sequences have same length."""
-        batch = [
-            {'input_ids': [1, 2, 3]},
-            {'input_ids': [4, 5, 6]}
-        ]
+        batch = [{"input_ids": [1, 2, 3]}, {"input_ids": [4, 5, 6]}]
 
         collated = collate_fn(batch)
 
         # No padding needed
-        assert collated['input_ids'].shape == (2, 3)
-        assert torch.equal(collated['input_ids'][0], torch.tensor([1, 2, 3]))
+        assert collated["input_ids"].shape == (2, 3)
+        assert torch.equal(collated["input_ids"][0], torch.tensor([1, 2, 3]))
 
 
 class TestTinyStoriesDataModule:
     """Test TinyStories data module."""
 
-    @patch('datasets.load_dataset')
+    @patch("datasets.load_dataset")
     def test_data_module_initialization(self, mock_load_dataset):
         """Test data module initialization."""
         datamodule = TinyStoriesDataModule(
-            tokenizer_type="char",
-            max_length=128,
-            batch_size=16,
-            max_samples=100
+            tokenizer_type="char", max_length=128, batch_size=16, max_samples=100
         )
 
         assert datamodule.tokenizer_type == "char"
         assert datamodule.max_length == 128
         assert datamodule.batch_size == 16
 
-    @patch('datasets.load_dataset')
+    @patch("datasets.load_dataset")
     def test_prepare_data_with_fraction(self, mock_load_dataset):
         """Test data preparation with data fraction."""
         # Mock dataset
@@ -303,10 +303,7 @@ class TestTinyStoriesDataModule:
         mock_val.__len__ = MagicMock(return_value=100)
         mock_val.select = MagicMock(return_value=mock_val)
 
-        mock_dataset = {
-            'train': mock_train,
-            'validation': mock_val
-        }
+        mock_dataset = {"train": mock_train, "validation": mock_val}
         mock_load_dataset.return_value = mock_dataset
 
         datamodule = TinyStoriesDataModule(data_fraction=0.1)
@@ -314,7 +311,7 @@ class TestTinyStoriesDataModule:
 
         # Check that selection was called with correct size
         mock_train.select.assert_called_once_with(range(100))  # 10% of 1000
-        mock_val.select.assert_called_once_with(range(10))     # 10% of 100
+        mock_val.select.assert_called_once_with(range(10))  # 10% of 100
 
     def test_setup_character_tokenizer(self):
         """Test character tokenizer setup."""
@@ -323,8 +320,8 @@ class TestTinyStoriesDataModule:
 
         # Create mock dataset
         mock_dataset = {
-            'train': [{'text': 'hello'}, {'text': 'world'}],
-            'validation': [{'text': 'test'}]
+            "train": [{"text": "hello"}, {"text": "world"}],
+            "validation": [{"text": "test"}],
         }
         datamodule.raw_dataset = mock_dataset
 
@@ -333,7 +330,7 @@ class TestTinyStoriesDataModule:
         assert isinstance(datamodule.tokenizer, CharacterTokenizer)
         assert datamodule.tokenizer.vocab_size > 0
 
-    @patch('data.tokenizers.create_tokenizer')
+    @patch("data.tokenizers.create_tokenizer")
     def test_setup_subword_tokenizer(self, mock_create_tokenizer):
         """Test subword tokenizer setup."""
         mock_tokenizer = MagicMock()
@@ -352,7 +349,7 @@ class TestSimpleTextDataModule:
 
     def test_load_text_file(self):
         """Test loading text from file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Line 1\nLine 2\n\nLine 3\n")
             temp_path = f.name
 
@@ -370,20 +367,18 @@ class TestSimpleTextDataModule:
 
     def test_data_splitting(self):
         """Test train/validation split."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("\n".join([f"Line {i}" for i in range(10)]))
             temp_path = f.name
 
         try:
             datamodule = SimpleTextDataModule(
-                train_file=temp_path,
-                val_split=0.2,
-                seed=42
+                train_file=temp_path, val_split=0.2, seed=42
             )
             datamodule.prepare_data()
 
             assert len(datamodule.train_texts) == 8  # 80% of 10
-            assert len(datamodule.val_texts) == 2    # 20% of 10
+            assert len(datamodule.val_texts) == 2  # 20% of 10
 
         finally:
             Path(temp_path).unlink()

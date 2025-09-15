@@ -3,23 +3,23 @@ Training script for TinyGPT with scaling law experiments.
 Supports various model sizes and configurations for research.
 """
 
-import os
-import json
-import time
 import argparse
+import json
+import os
+import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
-import yaml
+from typing import Any, Dict, Optional, Tuple
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 import wandb
-import numpy as np
+import yaml
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from models.tiny_gpt import TinyGPT, create_tiny_gpt
 from data.datamodule import create_datamodule, get_dataset_stats
+from models.tiny_gpt import TinyGPT, create_tiny_gpt
 
 
 class Trainer:
@@ -32,7 +32,7 @@ class Trainer:
         val_dataloader: DataLoader,
         config: Dict[str, Any],
         save_dir: str = "checkpoints",
-        use_wandb: bool = True
+        use_wandb: bool = True,
     ):
         self.model = model
         self.train_dataloader = train_dataloader
@@ -43,14 +43,14 @@ class Trainer:
         self.use_wandb = use_wandb
 
         # Training configuration
-        self.num_epochs = config['training']['num_epochs']
-        self.learning_rate = config['training']['learning_rate']
-        self.weight_decay = config['training']['weight_decay']
-        self.warmup_steps = config['training']['warmup_steps']
-        self.max_grad_norm = config['training'].get('max_grad_norm', 1.0)
-        self.eval_interval = config['training'].get('eval_interval', 500)
-        self.save_interval = config['training'].get('save_interval', 1000)
-        self.log_interval = config['training'].get('log_interval', 100)
+        self.num_epochs = config["training"]["num_epochs"]
+        self.learning_rate = config["training"]["learning_rate"]
+        self.weight_decay = config["training"]["weight_decay"]
+        self.warmup_steps = config["training"]["warmup_steps"]
+        self.max_grad_norm = config["training"].get("max_grad_norm", 1.0)
+        self.eval_interval = config["training"].get("eval_interval", 500)
+        self.save_interval = config["training"].get("save_interval", 1000)
+        self.log_interval = config["training"].get("log_interval", 100)
 
         # Device setup
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -62,7 +62,7 @@ class Trainer:
             self.model.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
-            betas=(0.9, 0.95)
+            betas=(0.9, 0.95),
         )
 
         # Learning rate scheduler
@@ -74,12 +74,14 @@ class Trainer:
         # Training state
         self.step = 0
         self.epoch = 0
-        self.best_val_loss = float('inf')
+        self.best_val_loss = float("inf")
         self.train_losses = []
         self.val_losses = []
 
         # Mixed precision setup
-        self.use_amp = config['training'].get('use_amp', True) and torch.cuda.is_available()
+        self.use_amp = (
+            config["training"].get("use_amp", True) and torch.cuda.is_available()
+        )
         if self.use_amp:
             self.scaler = torch.cuda.amp.GradScaler()
 
@@ -92,7 +94,7 @@ class Trainer:
         wandb.init(
             project="tiny-lm-scaling",
             config=self.config,
-            name=f"tinygpt_{self.config['model']['d_model']}d_{self.config['model']['n_layers']}l"
+            name=f"tinygpt_{self.config['model']['d_model']}d_{self.config['model']['n_layers']}l",
         )
         wandb.watch(self.model, log="all", log_freq=1000)
 
@@ -104,8 +106,8 @@ class Trainer:
 
     def train_step(self, batch: Dict[str, torch.Tensor]) -> float:
         """Single training step."""
-        input_ids = batch['input_ids'].to(self.device)
-        labels = batch['labels'].to(self.device)
+        input_ids = batch["input_ids"].to(self.device)
+        labels = batch["labels"].to(self.device)
 
         self.model.train()
         self.optimizer.zero_grad()
@@ -127,7 +129,7 @@ class Trainer:
         # Update learning rate with warmup
         if self.step < self.warmup_steps:
             for param_group in self.optimizer.param_groups:
-                param_group['lr'] = self.warmup_lr(self.step)
+                param_group["lr"] = self.warmup_lr(self.step)
         else:
             self.scheduler.step()
 
@@ -142,8 +144,8 @@ class Trainer:
         perplexities = []
 
         for batch in tqdm(self.val_dataloader, desc="Evaluating", leave=False):
-            input_ids = batch['input_ids'].to(self.device)
-            labels = batch['labels'].to(self.device)
+            input_ids = batch["input_ids"].to(self.device)
+            labels = batch["labels"].to(self.device)
 
             if self.use_amp:
                 with torch.cuda.amp.autocast():
@@ -163,10 +165,7 @@ class Trainer:
         avg_loss = total_loss / total_tokens
         avg_perplexity = np.mean(perplexities)
 
-        return {
-            'val_loss': avg_loss,
-            'val_perplexity': avg_perplexity
-        }
+        return {"val_loss": avg_loss, "val_perplexity": avg_perplexity}
 
     def save_checkpoint(self, filepath: Optional[str] = None, is_best: bool = False):
         """Save model checkpoint."""
@@ -174,19 +173,19 @@ class Trainer:
             filepath = self.save_dir / f"checkpoint_step_{self.step}.pt"
 
         checkpoint = {
-            'step': self.step,
-            'epoch': self.epoch,
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'scheduler_state_dict': self.scheduler.state_dict(),
-            'best_val_loss': self.best_val_loss,
-            'config': self.config,
-            'train_losses': self.train_losses,
-            'val_losses': self.val_losses
+            "step": self.step,
+            "epoch": self.epoch,
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "scheduler_state_dict": self.scheduler.state_dict(),
+            "best_val_loss": self.best_val_loss,
+            "config": self.config,
+            "train_losses": self.train_losses,
+            "val_losses": self.val_losses,
         }
 
         if self.use_amp:
-            checkpoint['scaler_state_dict'] = self.scaler.state_dict()
+            checkpoint["scaler_state_dict"] = self.scaler.state_dict()
 
         torch.save(checkpoint, filepath)
         print(f"Checkpoint saved to {filepath}")
@@ -200,18 +199,18 @@ class Trainer:
         """Load model checkpoint."""
         checkpoint = torch.load(filepath, map_location=self.device)
 
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
 
-        self.step = checkpoint['step']
-        self.epoch = checkpoint['epoch']
-        self.best_val_loss = checkpoint['best_val_loss']
-        self.train_losses = checkpoint.get('train_losses', [])
-        self.val_losses = checkpoint.get('val_losses', [])
+        self.step = checkpoint["step"]
+        self.epoch = checkpoint["epoch"]
+        self.best_val_loss = checkpoint["best_val_loss"]
+        self.train_losses = checkpoint.get("train_losses", [])
+        self.val_losses = checkpoint.get("val_losses", [])
 
-        if self.use_amp and 'scaler_state_dict' in checkpoint:
-            self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+        if self.use_amp and "scaler_state_dict" in checkpoint:
+            self.scaler.load_state_dict(checkpoint["scaler_state_dict"])
 
         print(f"Checkpoint loaded from {filepath}")
         return checkpoint
@@ -229,7 +228,9 @@ class Trainer:
             print(f"\nEpoch {epoch + 1}/{self.num_epochs}")
 
             # Training loop
-            for batch_idx, batch in enumerate(tqdm(self.train_dataloader, desc="Training")):
+            for batch_idx, batch in enumerate(
+                tqdm(self.train_dataloader, desc="Training")
+            ):
                 loss = self.train_step(batch)
                 running_loss += loss
                 self.step += 1
@@ -239,39 +240,47 @@ class Trainer:
                     avg_loss = running_loss / self.log_interval
                     self.train_losses.append(avg_loss)
 
-                    lr = self.optimizer.param_groups[0]['lr']
-                    tokens_per_sec = (self.log_interval * batch['input_ids'].numel()) / \
-                                   (time.time() - start_time) if self.step > self.log_interval else 0
+                    lr = self.optimizer.param_groups[0]["lr"]
+                    tokens_per_sec = (
+                        (self.log_interval * batch["input_ids"].numel())
+                        / (time.time() - start_time)
+                        if self.step > self.log_interval
+                        else 0
+                    )
 
                     log_data = {
-                        'train_loss': avg_loss,
-                        'learning_rate': lr,
-                        'tokens_per_sec': tokens_per_sec,
-                        'step': self.step,
-                        'epoch': epoch
+                        "train_loss": avg_loss,
+                        "learning_rate": lr,
+                        "tokens_per_sec": tokens_per_sec,
+                        "step": self.step,
+                        "epoch": epoch,
                     }
 
                     if self.use_wandb:
                         wandb.log(log_data)
 
-                    print(f"Step {self.step}: loss={avg_loss:.4f}, lr={lr:.2e}, tokens/s={tokens_per_sec:.1f}")
+                    print(
+                        f"Step {self.step}: loss={avg_loss:.4f}, lr={lr:.2e}, tokens/s={tokens_per_sec:.1f}"
+                    )
                     running_loss = 0.0
                     start_time = time.time()
 
                 # Evaluation
                 if self.step % self.eval_interval == 0:
                     eval_metrics = self.evaluate()
-                    self.val_losses.append(eval_metrics['val_loss'])
+                    self.val_losses.append(eval_metrics["val_loss"])
 
-                    print(f"Validation - Loss: {eval_metrics['val_loss']:.4f}, "
-                          f"Perplexity: {eval_metrics['val_perplexity']:.2f}")
+                    print(
+                        f"Validation - Loss: {eval_metrics['val_loss']:.4f}, "
+                        f"Perplexity: {eval_metrics['val_perplexity']:.2f}"
+                    )
 
                     if self.use_wandb:
                         wandb.log(eval_metrics)
 
                     # Save best model
-                    if eval_metrics['val_loss'] < self.best_val_loss:
-                        self.best_val_loss = eval_metrics['val_loss']
+                    if eval_metrics["val_loss"] < self.best_val_loss:
+                        self.best_val_loss = eval_metrics["val_loss"]
                         self.save_checkpoint(is_best=True)
 
                 # Save checkpoint
@@ -280,24 +289,26 @@ class Trainer:
 
         # Final evaluation
         final_metrics = self.evaluate()
-        print(f"\nFinal validation - Loss: {final_metrics['val_loss']:.4f}, "
-              f"Perplexity: {final_metrics['val_perplexity']:.2f}")
+        print(
+            f"\nFinal validation - Loss: {final_metrics['val_loss']:.4f}, "
+            f"Perplexity: {final_metrics['val_perplexity']:.2f}"
+        )
 
         # Save final model
         self.save_checkpoint(self.save_dir / "final_model.pt")
 
         return {
-            'final_val_loss': final_metrics['val_loss'],
-            'final_val_perplexity': final_metrics['val_perplexity'],
-            'best_val_loss': self.best_val_loss,
-            'total_steps': self.step,
-            'model_parameters': self.model.count_parameters()
+            "final_val_loss": final_metrics["val_loss"],
+            "final_val_perplexity": final_metrics["val_perplexity"],
+            "best_val_loss": self.best_val_loss,
+            "total_steps": self.step,
+            "model_parameters": self.model.count_parameters(),
         }
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load configuration from YAML file."""
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     return config
 
@@ -305,22 +316,24 @@ def load_config(config_path: str) -> Dict[str, Any]:
 def setup_experiment(config: Dict[str, Any]) -> Tuple[TinyGPT, DataLoader, DataLoader]:
     """Set up model and data for experiment."""
     # Create model
-    model = TinyGPT(**config['model'])
+    model = TinyGPT(**config["model"])
     print(f"Created model with {model.count_parameters():,} parameters")
 
     # Create data module
-    data_module = create_datamodule(**config['data'])
+    data_module = create_datamodule(**config["data"])
     data_module.prepare_data()
     data_module.setup_tokenizer()
     data_module.setup_datasets()
 
     # Update vocab size in model if using character tokenizer
-    if hasattr(data_module.tokenizer, 'vocab_size'):
+    if hasattr(data_module.tokenizer, "vocab_size"):
         if model.vocab_size != data_module.tokenizer.vocab_size:
-            print(f"Updating model vocab size from {model.vocab_size} to {data_module.tokenizer.vocab_size}")
+            print(
+                f"Updating model vocab size from {model.vocab_size} to {data_module.tokenizer.vocab_size}"
+            )
             # Recreate model with correct vocab size
-            config['model']['vocab_size'] = data_module.tokenizer.vocab_size
-            model = TinyGPT(**config['model'])
+            config["model"]["vocab_size"] = data_module.tokenizer.vocab_size
+            model = TinyGPT(**config["model"])
 
     # Create dataloaders
     train_loader = data_module.train_dataloader()
@@ -336,8 +349,15 @@ def setup_experiment(config: Dict[str, Any]) -> Tuple[TinyGPT, DataLoader, DataL
 def main():
     parser = argparse.ArgumentParser(description="Train TinyGPT model")
     parser.add_argument("--config", type=str, required=True, help="Path to config file")
-    parser.add_argument("--save_dir", type=str, default="checkpoints", help="Directory to save checkpoints")
-    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from")
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default="checkpoints",
+        help="Directory to save checkpoints",
+    )
+    parser.add_argument(
+        "--resume", type=str, default=None, help="Path to checkpoint to resume from"
+    )
     parser.add_argument("--no_wandb", action="store_true", help="Disable wandb logging")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
@@ -364,7 +384,7 @@ def main():
         val_dataloader=val_loader,
         config=config,
         save_dir=args.save_dir,
-        use_wandb=not args.no_wandb
+        use_wandb=not args.no_wandb,
     )
 
     # Resume from checkpoint if specified
@@ -376,7 +396,7 @@ def main():
 
     # Save results
     results_path = Path(args.save_dir) / "training_results.json"
-    with open(results_path, 'w') as f:
+    with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
 
     print(f"Training completed! Results saved to {results_path}")

@@ -3,17 +3,22 @@ Unit tests for TinyGPT model components.
 Includes gradient checks and architectural validation.
 """
 
+import sys
+from typing import Tuple
+
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
-import numpy as np
-from typing import Tuple
 
-import sys
-sys.path.append('src')
+sys.path.append("src")
 
 from models.tiny_gpt import (
-    TinyGPT, MultiHeadAttention, MLP, TransformerBlock, create_tiny_gpt
+    MLP,
+    MultiHeadAttention,
+    TinyGPT,
+    TransformerBlock,
+    create_tiny_gpt,
 )
 
 
@@ -52,13 +57,17 @@ class TestMultiHeadAttention:
 
             # Apply causal mask
             mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
-            scores = scores.masked_fill(mask, float('-inf'))
+            scores = scores.masked_fill(mask, float("-inf"))
             attn_weights = torch.softmax(scores, dim=-1)
 
             # Check that future positions have zero attention
             for i in range(seq_len):
                 for j in range(i + 1, seq_len):
-                    assert torch.allclose(attn_weights[0, :, i, j], torch.zeros_like(attn_weights[0, :, i, j]), atol=1e-6)
+                    assert torch.allclose(
+                        attn_weights[0, :, i, j],
+                        torch.zeros_like(attn_weights[0, :, i, j]),
+                        atol=1e-6,
+                    )
 
     def test_gradient_flow(self):
         """Test that gradients flow through attention."""
@@ -94,7 +103,9 @@ class TestMLP:
         mlp = MLP(d_model, d_ff)
 
         # Test with known input
-        x = torch.tensor([[[1.0, -1.0, 0.0, 2.0] * 8]], dtype=torch.float32)  # Shape: (1, 1, 32)
+        x = torch.tensor(
+            [[[1.0, -1.0, 0.0, 2.0] * 8]], dtype=torch.float32
+        )  # Shape: (1, 1, 32)
         output = mlp(x)
 
         # Should be different from input due to GELU nonlinearity
@@ -160,32 +171,32 @@ class TestTinyGPT:
     @pytest.fixture
     def model_config(self):
         return {
-            'vocab_size': 1000,
-            'd_model': 64,
-            'n_layers': 2,
-            'n_heads': 4,
-            'max_seq_len': 16,
-            'dropout': 0.1
+            "vocab_size": 1000,
+            "d_model": 64,
+            "n_layers": 2,
+            "n_heads": 4,
+            "max_seq_len": 16,
+            "dropout": 0.1,
         }
 
     def test_model_creation(self, model_config):
         """Test model creation with valid config."""
         model = TinyGPT(**model_config)
         assert isinstance(model, TinyGPT)
-        assert model.vocab_size == model_config['vocab_size']
-        assert model.d_model == model_config['d_model']
+        assert model.vocab_size == model_config["vocab_size"]
+        assert model.d_model == model_config["d_model"]
 
     def test_forward_shape(self, model_config):
         """Test model forward pass output shapes."""
         model = TinyGPT(**model_config)
         batch_size, seq_len = 2, 8
 
-        input_ids = torch.randint(0, model_config['vocab_size'], (batch_size, seq_len))
-        targets = torch.randint(0, model_config['vocab_size'], (batch_size, seq_len))
+        input_ids = torch.randint(0, model_config["vocab_size"], (batch_size, seq_len))
+        targets = torch.randint(0, model_config["vocab_size"], (batch_size, seq_len))
 
         logits, loss = model(input_ids, targets)
 
-        assert logits.shape == (batch_size, seq_len, model_config['vocab_size'])
+        assert logits.shape == (batch_size, seq_len, model_config["vocab_size"])
         assert loss.shape == ()  # Scalar loss
 
     def test_forward_without_targets(self, model_config):
@@ -193,10 +204,10 @@ class TestTinyGPT:
         model = TinyGPT(**model_config)
         batch_size, seq_len = 2, 8
 
-        input_ids = torch.randint(0, model_config['vocab_size'], (batch_size, seq_len))
+        input_ids = torch.randint(0, model_config["vocab_size"], (batch_size, seq_len))
         logits, loss = model(input_ids)
 
-        assert logits.shape == (batch_size, seq_len, model_config['vocab_size'])
+        assert logits.shape == (batch_size, seq_len, model_config["vocab_size"])
         assert loss is None
 
     def test_parameter_count(self, model_config):
@@ -205,10 +216,10 @@ class TestTinyGPT:
         param_count = model.count_parameters()
 
         # Manual calculation for verification
-        vocab_size = model_config['vocab_size']
-        d_model = model_config['d_model']
-        n_layers = model_config['n_layers']
-        max_seq_len = model_config['max_seq_len']
+        vocab_size = model_config["vocab_size"]
+        d_model = model_config["d_model"]
+        n_layers = model_config["n_layers"]
+        max_seq_len = model_config["max_seq_len"]
 
         # Embeddings: token + position
         embedding_params = vocab_size * d_model + max_seq_len * d_model
@@ -235,11 +246,13 @@ class TestTinyGPT:
         batch_size, seq_len = 1, 4
         max_new_tokens = 5
 
-        input_ids = torch.randint(0, model_config['vocab_size'], (batch_size, seq_len))
+        input_ids = torch.randint(0, model_config["vocab_size"], (batch_size, seq_len))
 
         model.eval()
         with torch.no_grad():
-            generated = model.generate(input_ids, max_new_tokens=max_new_tokens, do_sample=False)
+            generated = model.generate(
+                input_ids, max_new_tokens=max_new_tokens, do_sample=False
+            )
 
         assert generated.shape == (batch_size, seq_len + max_new_tokens)
 
@@ -275,7 +288,9 @@ class TestTinyGPT:
             return grad
 
         # Test gradient on small input
-        x = torch.randn(batch_size, seq_len, model_config['d_model'], requires_grad=True)
+        x = torch.randn(
+            batch_size, seq_len, model_config["d_model"], requires_grad=True
+        )
 
         # Analytical gradient
         output = attn_layer(x)
@@ -292,8 +307,12 @@ class TestTinyGPT:
         max_error = torch.max(torch.abs(analytical_grad - numerical_grad))
         relative_error = max_error / torch.max(torch.abs(analytical_grad))
 
-        print(f"Gradient check - Max error: {max_error:.2e}, Relative error: {relative_error:.2e}")
-        assert relative_error < 1e-3, f"Gradient check failed: relative error {relative_error:.2e} > 1e-3"
+        print(
+            f"Gradient check - Max error: {max_error:.2e}, Relative error: {relative_error:.2e}"
+        )
+        assert (
+            relative_error < 1e-3
+        ), f"Gradient check failed: relative error {relative_error:.2e} > 1e-3"
 
     def test_weight_tying(self, model_config):
         """Test that token embedding and output weights are tied."""
@@ -306,7 +325,7 @@ class TestTinyGPT:
         """Test model creation from config dict."""
         model = TinyGPT.from_config(model_config)
         assert isinstance(model, TinyGPT)
-        assert model.vocab_size == model_config['vocab_size']
+        assert model.vocab_size == model_config["vocab_size"]
 
     def test_create_tiny_gpt_factory(self):
         """Test factory function."""
@@ -355,7 +374,9 @@ class TestTinyGPT:
         torch.manual_seed(42)
         generated2 = model.generate(input_ids, max_new_tokens=5, do_sample=False)
 
-        assert torch.equal(generated1, generated2), "Deterministic generation should be reproducible"
+        assert torch.equal(
+            generated1, generated2
+        ), "Deterministic generation should be reproducible"
 
 
 class TestModelConstraints:
@@ -363,7 +384,9 @@ class TestModelConstraints:
 
     def test_sequence_length_constraint(self):
         """Test that model respects maximum sequence length."""
-        model = TinyGPT(vocab_size=100, d_model=32, n_layers=2, n_heads=4, max_seq_len=8)
+        model = TinyGPT(
+            vocab_size=100, d_model=32, n_layers=2, n_heads=4, max_seq_len=8
+        )
 
         # Should work with sequence <= max_seq_len
         input_ids = torch.randint(0, 100, (1, 8))
@@ -378,11 +401,15 @@ class TestModelConstraints:
     def test_attention_head_divisibility(self):
         """Test that d_model must be divisible by n_heads."""
         with pytest.raises(AssertionError):
-            TinyGPT(vocab_size=100, d_model=33, n_layers=2, n_heads=4)  # 33 not divisible by 4
+            TinyGPT(
+                vocab_size=100, d_model=33, n_layers=2, n_heads=4
+            )  # 33 not divisible by 4
 
     def test_empty_input_handling(self):
         """Test model behavior with minimal inputs."""
-        model = TinyGPT(vocab_size=100, d_model=32, n_layers=2, n_heads=4, max_seq_len=8)
+        model = TinyGPT(
+            vocab_size=100, d_model=32, n_layers=2, n_heads=4, max_seq_len=8
+        )
 
         # Single token input
         input_ids = torch.tensor([[1]])

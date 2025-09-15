@@ -2,18 +2,19 @@
 Unit tests for training functionality.
 """
 
-import pytest
-import torch
+import sys
 import tempfile
-import yaml
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import sys
-sys.path.append('src')
+import pytest
+import torch
+import yaml
 
-from train import Trainer, load_config, setup_experiment
+sys.path.append("src")
+
 from models.tiny_gpt import TinyGPT
+from train import Trainer, load_config, setup_experiment
 
 
 class TestTrainer:
@@ -22,49 +23,54 @@ class TestTrainer:
     @pytest.fixture
     def minimal_config(self):
         return {
-            'model': {
-                'vocab_size': 100,
-                'd_model': 32,
-                'n_layers': 2,
-                'n_heads': 4,
-                'max_seq_len': 16,
-                'dropout': 0.1
+            "model": {
+                "vocab_size": 100,
+                "d_model": 32,
+                "n_layers": 2,
+                "n_heads": 4,
+                "max_seq_len": 16,
+                "dropout": 0.1,
             },
-            'training': {
-                'num_epochs': 1,
-                'learning_rate': 1e-3,
-                'weight_decay': 0.01,
-                'warmup_steps': 5,
-                'max_grad_norm': 1.0,
-                'use_amp': False,
-                'eval_interval': 10,
-                'save_interval': 20,
-                'log_interval': 5
-            }
+            "training": {
+                "num_epochs": 1,
+                "learning_rate": 1e-3,
+                "weight_decay": 0.01,
+                "warmup_steps": 5,
+                "max_grad_norm": 1.0,
+                "use_amp": False,
+                "eval_interval": 10,
+                "save_interval": 20,
+                "log_interval": 5,
+            },
         }
 
     @pytest.fixture
     def mock_dataloaders(self):
         """Create mock dataloaders for testing."""
+
         def create_mock_batch():
             return {
-                'input_ids': torch.randint(0, 100, (2, 8)),
-                'labels': torch.randint(0, 100, (2, 8))
+                "input_ids": torch.randint(0, 100, (2, 8)),
+                "labels": torch.randint(0, 100, (2, 8)),
             }
 
         train_loader = MagicMock()
-        train_loader.__iter__ = MagicMock(return_value=iter([create_mock_batch() for _ in range(3)]))
+        train_loader.__iter__ = MagicMock(
+            return_value=iter([create_mock_batch() for _ in range(3)])
+        )
         train_loader.__len__ = MagicMock(return_value=3)
 
         val_loader = MagicMock()
-        val_loader.__iter__ = MagicMock(return_value=iter([create_mock_batch() for _ in range(2)]))
+        val_loader.__iter__ = MagicMock(
+            return_value=iter([create_mock_batch() for _ in range(2)])
+        )
         val_loader.__len__ = MagicMock(return_value=2)
 
         return train_loader, val_loader
 
     def test_trainer_initialization(self, minimal_config, mock_dataloaders):
         """Test trainer initialization."""
-        model = TinyGPT(**minimal_config['model'])
+        model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
 
         trainer = Trainer(
@@ -72,7 +78,7 @@ class TestTrainer:
             train_dataloader=train_loader,
             val_dataloader=val_loader,
             config=minimal_config,
-            use_wandb=False
+            use_wandb=False,
         )
 
         assert trainer.model is model
@@ -82,7 +88,7 @@ class TestTrainer:
 
     def test_warmup_lr_calculation(self, minimal_config, mock_dataloaders):
         """Test learning rate warmup calculation."""
-        model = TinyGPT(**minimal_config['model'])
+        model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
 
         trainer = Trainer(
@@ -90,7 +96,7 @@ class TestTrainer:
             train_dataloader=train_loader,
             val_dataloader=val_loader,
             config=minimal_config,
-            use_wandb=False
+            use_wandb=False,
         )
 
         # Test warmup schedule
@@ -100,7 +106,7 @@ class TestTrainer:
 
     def test_train_step(self, minimal_config, mock_dataloaders):
         """Test single training step."""
-        model = TinyGPT(**minimal_config['model'])
+        model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
 
         trainer = Trainer(
@@ -108,15 +114,17 @@ class TestTrainer:
             train_dataloader=train_loader,
             val_dataloader=val_loader,
             config=minimal_config,
-            use_wandb=False
+            use_wandb=False,
         )
 
         batch = {
-            'input_ids': torch.randint(0, 100, (2, 8)),
-            'labels': torch.randint(0, 100, (2, 8))
+            "input_ids": torch.randint(0, 100, (2, 8)),
+            "labels": torch.randint(0, 100, (2, 8)),
         }
 
-        initial_params = {name: param.clone() for name, param in model.named_parameters()}
+        initial_params = {
+            name: param.clone() for name, param in model.named_parameters()
+        }
 
         loss = trainer.train_step(batch)
 
@@ -127,12 +135,14 @@ class TestTrainer:
         # Check that parameters were updated
         for name, param in model.named_parameters():
             if param.requires_grad:
-                assert not torch.equal(param, initial_params[name]), f"Parameter {name} was not updated"
+                assert not torch.equal(
+                    param, initial_params[name]
+                ), f"Parameter {name} was not updated"
 
-    @patch('torch.no_grad')
+    @patch("torch.no_grad")
     def test_evaluate(self, mock_no_grad, minimal_config, mock_dataloaders):
         """Test evaluation function."""
-        model = TinyGPT(**minimal_config['model'])
+        model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
 
         trainer = Trainer(
@@ -140,7 +150,7 @@ class TestTrainer:
             train_dataloader=train_loader,
             val_dataloader=val_loader,
             config=minimal_config,
-            use_wandb=False
+            use_wandb=False,
         )
 
         # Mock torch.no_grad context manager
@@ -149,14 +159,14 @@ class TestTrainer:
 
         metrics = trainer.evaluate()
 
-        assert 'val_loss' in metrics
-        assert 'val_perplexity' in metrics
-        assert isinstance(metrics['val_loss'], float)
-        assert isinstance(metrics['val_perplexity'], float)
+        assert "val_loss" in metrics
+        assert "val_perplexity" in metrics
+        assert isinstance(metrics["val_loss"], float)
+        assert isinstance(metrics["val_perplexity"], float)
 
     def test_save_load_checkpoint(self, minimal_config, mock_dataloaders):
         """Test checkpoint saving and loading."""
-        model = TinyGPT(**minimal_config['model'])
+        model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -166,7 +176,7 @@ class TestTrainer:
                 val_dataloader=val_loader,
                 config=minimal_config,
                 save_dir=temp_dir,
-                use_wandb=False
+                use_wandb=False,
             )
 
             # Save checkpoint
@@ -184,14 +194,16 @@ class TestTrainer:
             assert trainer.step == 100
             assert trainer.epoch == 5
             assert trainer.best_val_loss == 2.5
-            assert 'model_state_dict' in loaded_checkpoint
-            assert 'optimizer_state_dict' in loaded_checkpoint
+            assert "model_state_dict" in loaded_checkpoint
+            assert "optimizer_state_dict" in loaded_checkpoint
 
-    @patch('wandb.init')
-    @patch('wandb.watch')
-    def test_wandb_integration(self, mock_watch, mock_init, minimal_config, mock_dataloaders):
+    @patch("wandb.init")
+    @patch("wandb.watch")
+    def test_wandb_integration(
+        self, mock_watch, mock_init, minimal_config, mock_dataloaders
+    ):
         """Test Weights & Biases integration."""
-        model = TinyGPT(**minimal_config['model'])
+        model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
 
         trainer = Trainer(
@@ -199,7 +211,7 @@ class TestTrainer:
             train_dataloader=train_loader,
             val_dataloader=val_loader,
             config=minimal_config,
-            use_wandb=True
+            use_wandb=True,
         )
 
         mock_init.assert_called_once()
@@ -212,17 +224,11 @@ class TestConfigLoading:
     def test_load_config(self):
         """Test loading configuration from YAML file."""
         config_data = {
-            'model': {
-                'vocab_size': 1000,
-                'd_model': 64
-            },
-            'training': {
-                'num_epochs': 5,
-                'learning_rate': 1e-4
-            }
+            "model": {"vocab_size": 1000, "d_model": 64},
+            "training": {"num_epochs": 5, "learning_rate": 1e-4},
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
             temp_path = f.name
 
@@ -234,7 +240,7 @@ class TestConfigLoading:
 
     def test_load_invalid_config(self):
         """Test loading invalid configuration file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("invalid: yaml: content: [")
             temp_path = f.name
 
@@ -248,22 +254,19 @@ class TestConfigLoading:
 class TestExperimentSetup:
     """Test experiment setup functionality."""
 
-    @patch('data.datamodule.create_datamodule')
+    @patch("data.datamodule.create_datamodule")
     def test_setup_experiment(self, mock_create_datamodule):
         """Test experiment setup with mocked data."""
         config = {
-            'model': {
-                'vocab_size': 100,
-                'd_model': 32,
-                'n_layers': 2,
-                'n_heads': 4,
-                'max_seq_len': 16,
-                'dropout': 0.1
+            "model": {
+                "vocab_size": 100,
+                "d_model": 32,
+                "n_layers": 2,
+                "n_heads": 4,
+                "max_seq_len": 16,
+                "dropout": 0.1,
             },
-            'data': {
-                'dataset_name': 'tinystories',
-                'batch_size': 16
-            }
+            "data": {"dataset_name": "tinystories", "batch_size": 16},
         }
 
         # Mock data module
@@ -292,22 +295,19 @@ class TestExperimentSetup:
         mock_datamodule.setup_tokenizer.assert_called_once()
         mock_datamodule.setup_datasets.assert_called_once()
 
-    @patch('data.datamodule.create_datamodule')
+    @patch("data.datamodule.create_datamodule")
     def test_setup_experiment_vocab_size_mismatch(self, mock_create_datamodule):
         """Test experiment setup when vocab sizes don't match."""
         config = {
-            'model': {
-                'vocab_size': 100,
-                'd_model': 32,
-                'n_layers': 2,
-                'n_heads': 4,
-                'max_seq_len': 16,
-                'dropout': 0.1
+            "model": {
+                "vocab_size": 100,
+                "d_model": 32,
+                "n_layers": 2,
+                "n_heads": 4,
+                "max_seq_len": 16,
+                "dropout": 0.1,
             },
-            'data': {
-                'dataset_name': 'tinystories',
-                'batch_size': 16
-            }
+            "data": {"dataset_name": "tinystories", "batch_size": 16},
         }
 
         # Mock data module with different vocab size
@@ -336,35 +336,35 @@ class TestTrainingIntegration:
         """Test a minimal training run without external dependencies."""
         # Create minimal config
         config = {
-            'model': {
-                'vocab_size': 50,
-                'd_model': 32,
-                'n_layers': 2,
-                'n_heads': 4,
-                'max_seq_len': 8,
-                'dropout': 0.0
+            "model": {
+                "vocab_size": 50,
+                "d_model": 32,
+                "n_layers": 2,
+                "n_heads": 4,
+                "max_seq_len": 8,
+                "dropout": 0.0,
             },
-            'training': {
-                'num_epochs': 1,
-                'learning_rate': 1e-3,
-                'weight_decay': 0.01,
-                'warmup_steps': 2,
-                'max_grad_norm': 1.0,
-                'use_amp': False,
-                'eval_interval': 2,
-                'save_interval': 10,
-                'log_interval': 1
-            }
+            "training": {
+                "num_epochs": 1,
+                "learning_rate": 1e-3,
+                "weight_decay": 0.01,
+                "warmup_steps": 2,
+                "max_grad_norm": 1.0,
+                "use_amp": False,
+                "eval_interval": 2,
+                "save_interval": 10,
+                "log_interval": 1,
+            },
         }
 
         # Create model
-        model = TinyGPT(**config['model'])
+        model = TinyGPT(**config["model"])
 
         # Create simple synthetic data
         def create_batch():
             return {
-                'input_ids': torch.randint(0, 50, (2, 4)),
-                'labels': torch.randint(0, 50, (2, 4))
+                "input_ids": torch.randint(0, 50, (2, 4)),
+                "labels": torch.randint(0, 50, (2, 4)),
             }
 
         train_data = [create_batch() for _ in range(3)]
@@ -386,16 +386,16 @@ class TestTrainingIntegration:
                 val_dataloader=val_loader,
                 config=config,
                 save_dir=temp_dir,
-                use_wandb=False
+                use_wandb=False,
             )
 
             # Run training
             results = trainer.train()
 
             # Check that training completed
-            assert 'final_val_loss' in results
-            assert 'model_parameters' in results
-            assert results['model_parameters'] == model.count_parameters()
+            assert "final_val_loss" in results
+            assert "model_parameters" in results
+            assert results["model_parameters"] == model.count_parameters()
 
             # Check that some training steps were taken
             assert trainer.step > 0
@@ -409,25 +409,25 @@ class TestTrainingIntegration:
         torch.manual_seed(42)
 
         config = {
-            'model': {
-                'vocab_size': 30,
-                'd_model': 16,
-                'n_layers': 1,
-                'n_heads': 2,
-                'max_seq_len': 4,
-                'dropout': 0.0
+            "model": {
+                "vocab_size": 30,
+                "d_model": 16,
+                "n_layers": 1,
+                "n_heads": 2,
+                "max_seq_len": 4,
+                "dropout": 0.0,
             },
-            'training': {
-                'num_epochs': 1,
-                'learning_rate': 1e-3,
-                'weight_decay': 0.0,
-                'warmup_steps': 0,
-                'max_grad_norm': 1.0,
-                'use_amp': False,
-                'eval_interval': 100,
-                'save_interval': 100,
-                'log_interval': 100
-            }
+            "training": {
+                "num_epochs": 1,
+                "learning_rate": 1e-3,
+                "weight_decay": 0.0,
+                "warmup_steps": 0,
+                "max_grad_norm": 1.0,
+                "use_amp": False,
+                "eval_interval": 100,
+                "save_interval": 100,
+                "log_interval": 100,
+            },
         }
 
         # Fixed sequence for reproducibility
@@ -435,12 +435,12 @@ class TestTrainingIntegration:
 
         def create_fixed_batch(batch_size):
             return {
-                'input_ids': fixed_sequence.repeat(batch_size, 1),
-                'labels': fixed_sequence.repeat(batch_size, 1)
+                "input_ids": fixed_sequence.repeat(batch_size, 1),
+                "labels": fixed_sequence.repeat(batch_size, 1),
             }
 
         # Test with batch size 1
-        model1 = TinyGPT(**config['model'])
+        model1 = TinyGPT(**config["model"])
         data1 = [create_fixed_batch(1)]
         train_loader1 = MagicMock()
         train_loader1.__iter__ = MagicMock(return_value=iter(data1))
@@ -455,7 +455,7 @@ class TestTrainingIntegration:
             train_dataloader=train_loader1,
             val_dataloader=val_loader1,
             config=config,
-            use_wandb=False
+            use_wandb=False,
         )
 
         # Perform one training step
@@ -463,13 +463,13 @@ class TestTrainingIntegration:
 
         # Test with batch size 2 (should be approximately same loss per sample)
         torch.manual_seed(42)  # Reset seed
-        model2 = TinyGPT(**config['model'])
+        model2 = TinyGPT(**config["model"])
         trainer2 = Trainer(
             model=model2,
             train_dataloader=train_loader1,
             val_dataloader=val_loader1,
             config=config,
-            use_wandb=False
+            use_wandb=False,
         )
 
         loss2 = trainer2.train_step(create_fixed_batch(2))

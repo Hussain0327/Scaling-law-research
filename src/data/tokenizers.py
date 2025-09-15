@@ -5,8 +5,8 @@ Supports both character-level and subword tokenization.
 
 import json
 import pickle
-from typing import List, Optional, Union, Dict, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import torch
 from transformers import GPT2TokenizerFast
@@ -26,10 +26,10 @@ class CharacterTokenizer:
             self.vocab_size = len(vocab)
 
         # Special tokens
-        self.pad_token = '<pad>'
-        self.unk_token = '<unk>'
-        self.eos_token = '<eos>'
-        self.bos_token = '<bos>'
+        self.pad_token = "<pad>"
+        self.unk_token = "<unk>"
+        self.eos_token = "<eos>"
+        self.bos_token = "<bos>"
 
     def build_vocab(self, texts: List[str]) -> None:
         """Build vocabulary from a list of texts."""
@@ -38,7 +38,12 @@ class CharacterTokenizer:
             chars.update(text)
 
         # Add special tokens
-        special_tokens = [self.pad_token, self.unk_token, self.eos_token, self.bos_token]
+        special_tokens = [
+            self.pad_token,
+            self.unk_token,
+            self.eos_token,
+            self.bos_token,
+        ]
         all_chars = special_tokens + sorted(list(chars))
 
         self.char_to_idx = {char: idx for idx, char in enumerate(all_chars)}
@@ -60,7 +65,11 @@ class CharacterTokenizer:
 
         return tokens
 
-    def decode(self, token_ids: Union[List[int], torch.Tensor], skip_special_tokens: bool = True) -> str:
+    def decode(
+        self,
+        token_ids: Union[List[int], torch.Tensor],
+        skip_special_tokens: bool = True,
+    ) -> str:
         """Decode token ids to text."""
         if isinstance(token_ids, torch.Tensor):
             token_ids = token_ids.tolist()
@@ -70,7 +79,7 @@ class CharacterTokenizer:
             self.char_to_idx[self.pad_token],
             self.char_to_idx[self.unk_token],
             self.char_to_idx[self.eos_token],
-            self.char_to_idx[self.bos_token]
+            self.char_to_idx[self.bos_token],
         }
 
         for token_id in token_ids:
@@ -78,38 +87,38 @@ class CharacterTokenizer:
                 continue
             chars.append(self.idx_to_char.get(token_id, self.unk_token))
 
-        return ''.join(chars)
+        return "".join(chars)
 
     def save(self, path: Union[str, Path]) -> None:
         """Save tokenizer to file."""
         path = Path(path)
         vocab_data = {
-            'char_to_idx': self.char_to_idx,
-            'vocab_size': self.vocab_size,
-            'special_tokens': {
-                'pad_token': self.pad_token,
-                'unk_token': self.unk_token,
-                'eos_token': self.eos_token,
-                'bos_token': self.bos_token
-            }
+            "char_to_idx": self.char_to_idx,
+            "vocab_size": self.vocab_size,
+            "special_tokens": {
+                "pad_token": self.pad_token,
+                "unk_token": self.unk_token,
+                "eos_token": self.eos_token,
+                "bos_token": self.bos_token,
+            },
         }
 
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(vocab_data, f, indent=2, ensure_ascii=False)
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> 'CharacterTokenizer':
+    def load(cls, path: Union[str, Path]) -> "CharacterTokenizer":
         """Load tokenizer from file."""
         path = Path(path)
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             vocab_data = json.load(f)
 
-        tokenizer = cls(vocab=vocab_data['char_to_idx'])
-        special_tokens = vocab_data['special_tokens']
-        tokenizer.pad_token = special_tokens['pad_token']
-        tokenizer.unk_token = special_tokens['unk_token']
-        tokenizer.eos_token = special_tokens['eos_token']
-        tokenizer.bos_token = special_tokens['bos_token']
+        tokenizer = cls(vocab=vocab_data["char_to_idx"])
+        special_tokens = vocab_data["special_tokens"]
+        tokenizer.pad_token = special_tokens["pad_token"]
+        tokenizer.unk_token = special_tokens["unk_token"]
+        tokenizer.eos_token = special_tokens["eos_token"]
+        tokenizer.bos_token = special_tokens["bos_token"]
 
         return tokenizer
 
@@ -142,16 +151,25 @@ class SubwordTokenizer:
 
         self.vocab_size = len(self.tokenizer)
 
-    def encode(self, text: str, add_special_tokens: bool = True, max_length: Optional[int] = None) -> List[int]:
+    def encode(
+        self,
+        text: str,
+        add_special_tokens: bool = True,
+        max_length: Optional[int] = None,
+    ) -> List[int]:
         """Encode text to token ids."""
         return self.tokenizer.encode(
             text,
             add_special_tokens=add_special_tokens,
             max_length=max_length,
-            truncation=max_length is not None
+            truncation=max_length is not None,
         )
 
-    def decode(self, token_ids: Union[List[int], torch.Tensor], skip_special_tokens: bool = True) -> str:
+    def decode(
+        self,
+        token_ids: Union[List[int], torch.Tensor],
+        skip_special_tokens: bool = True,
+    ) -> str:
         """Decode token ids to text."""
         if isinstance(token_ids, torch.Tensor):
             token_ids = token_ids.tolist()
@@ -164,7 +182,7 @@ class SubwordTokenizer:
         max_length: Optional[int] = None,
         padding: bool = True,
         truncation: bool = True,
-        return_tensors: str = "pt"
+        return_tensors: str = "pt",
     ) -> Dict[str, torch.Tensor]:
         """Batch encode texts."""
         return self.tokenizer(
@@ -172,7 +190,7 @@ class SubwordTokenizer:
             max_length=max_length,
             padding=padding,
             truncation=truncation,
-            return_tensors=return_tensors
+            return_tensors=return_tensors,
         )
 
     @property
@@ -192,7 +210,9 @@ class SubwordTokenizer:
         return self.tokenizer.bos_token_id
 
 
-def create_tokenizer(tokenizer_type: str = "char", **kwargs) -> Union[CharacterTokenizer, SubwordTokenizer]:
+def create_tokenizer(
+    tokenizer_type: str = "char", **kwargs
+) -> Union[CharacterTokenizer, SubwordTokenizer]:
     """
     Factory function to create tokenizers.
 
@@ -211,7 +231,9 @@ def create_tokenizer(tokenizer_type: str = "char", **kwargs) -> Union[CharacterT
         raise ValueError(f"Unknown tokenizer type: {tokenizer_type}")
 
 
-def collate_fn(batch: List[Dict[str, Any]], pad_token_id: int = 0) -> Dict[str, torch.Tensor]:
+def collate_fn(
+    batch: List[Dict[str, Any]], pad_token_id: int = 0
+) -> Dict[str, torch.Tensor]:
     """
     Collate function for batching sequences.
 
@@ -222,7 +244,7 @@ def collate_fn(batch: List[Dict[str, Any]], pad_token_id: int = 0) -> Dict[str, 
     Returns:
         Batched and padded tensors
     """
-    input_ids = [torch.tensor(sample['input_ids']) for sample in batch]
+    input_ids = [torch.tensor(sample["input_ids"]) for sample in batch]
 
     # Pad sequences to same length
     max_len = max(len(seq) for seq in input_ids)
@@ -230,21 +252,23 @@ def collate_fn(batch: List[Dict[str, Any]], pad_token_id: int = 0) -> Dict[str, 
 
     for seq in input_ids:
         padded_seq = torch.full((max_len,), pad_token_id, dtype=seq.dtype)
-        padded_seq[:len(seq)] = seq
+        padded_seq[: len(seq)] = seq
         padded_input_ids.append(padded_seq)
 
-    result = {'input_ids': torch.stack(padded_input_ids)}
+    result = {"input_ids": torch.stack(padded_input_ids)}
 
     # Handle labels if present
-    if 'labels' in batch[0]:
-        labels = [torch.tensor(sample['labels']) for sample in batch]
+    if "labels" in batch[0]:
+        labels = [torch.tensor(sample["labels"]) for sample in batch]
         padded_labels = []
 
         for seq in labels:
-            padded_seq = torch.full((max_len,), -100, dtype=seq.dtype)  # -100 is ignore index
-            padded_seq[:len(seq)] = seq
+            padded_seq = torch.full(
+                (max_len,), -100, dtype=seq.dtype
+            )  # -100 is ignore index
+            padded_seq[: len(seq)] = seq
             padded_labels.append(padded_seq)
 
-        result['labels'] = torch.stack(padded_labels)
+        result["labels"] = torch.stack(padded_labels)
 
     return result

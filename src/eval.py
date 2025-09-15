@@ -3,39 +3,40 @@ Evaluation script for TinyGPT models.
 Includes metrics computation, scaling law analysis, and curve plotting.
 """
 
-import os
-import json
 import argparse
+import json
+import os
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
-import yaml
+from typing import Any, Dict, List, Optional, Tuple
 
-import torch
-import torch.nn.functional as F
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
+import torch
+import torch.nn.functional as F
+import yaml
 from scipy.optimize import curve_fit
 from tqdm import tqdm
 
-from models.tiny_gpt import TinyGPT
 from data.datamodule import create_datamodule, get_dataset_stats
+from models.tiny_gpt import TinyGPT
 
 
 class ModelEvaluator:
     """Comprehensive model evaluation with scaling law analysis."""
 
     def __init__(self, device: str = "auto"):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device == "auto" else torch.device(device)
+        self.device = (
+            torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if device == "auto"
+            else torch.device(device)
+        )
         print(f"Using device: {self.device}")
 
     @torch.no_grad()
     def evaluate_model(
-        self,
-        model: TinyGPT,
-        dataloader,
-        max_batches: Optional[int] = None
+        self, model: TinyGPT, dataloader, max_batches: Optional[int] = None
     ) -> Dict[str, float]:
         """
         Evaluate a single model on a dataset.
@@ -62,8 +63,8 @@ class ModelEvaluator:
             if max_batches and batches_processed >= max_batches:
                 break
 
-            input_ids = batch['input_ids'].to(self.device)
-            labels = batch['labels'].to(self.device)
+            input_ids = batch["input_ids"].to(self.device)
+            labels = batch["labels"].to(self.device)
 
             logits, loss = model(input_ids, labels)
 
@@ -85,25 +86,27 @@ class ModelEvaluator:
             batches_processed += 1
 
         # Compute metrics
-        avg_loss = total_loss / total_tokens if total_tokens > 0 else float('inf')
+        avg_loss = total_loss / total_tokens if total_tokens > 0 else float("inf")
         perplexity = np.exp(avg_loss)
-        accuracy = correct_predictions / total_predictions if total_predictions > 0 else 0.0
+        accuracy = (
+            correct_predictions / total_predictions if total_predictions > 0 else 0.0
+        )
         loss_std = np.std(batch_losses) if batch_losses else 0.0
 
         return {
-            'loss': avg_loss,
-            'perplexity': perplexity,
-            'accuracy': accuracy,
-            'total_tokens': total_tokens,
-            'total_batches': batches_processed,
-            'loss_std': loss_std
+            "loss": avg_loss,
+            "perplexity": perplexity,
+            "accuracy": accuracy,
+            "total_tokens": total_tokens,
+            "total_batches": batches_processed,
+            "loss_std": loss_std,
         }
 
     def evaluate_multiple_checkpoints(
         self,
         checkpoint_paths: List[str],
         config: Dict[str, Any],
-        max_batches: Optional[int] = None
+        max_batches: Optional[int] = None,
     ) -> pd.DataFrame:
         """
         Evaluate multiple model checkpoints.
@@ -117,7 +120,7 @@ class ModelEvaluator:
             DataFrame with evaluation results
         """
         # Set up data
-        data_module = create_datamodule(**config['data'])
+        data_module = create_datamodule(**config["data"])
         data_module.prepare_data()
         data_module.setup_tokenizer()
         data_module.setup_datasets()
@@ -130,12 +133,12 @@ class ModelEvaluator:
         for checkpoint_path in tqdm(checkpoint_paths, desc="Evaluating checkpoints"):
             try:
                 # Load checkpoint
-                checkpoint = torch.load(checkpoint_path, map_location='cpu')
-                model_config = checkpoint['config']['model']
+                checkpoint = torch.load(checkpoint_path, map_location="cpu")
+                model_config = checkpoint["config"]["model"]
 
                 # Create and load model
                 model = TinyGPT(**model_config)
-                model.load_state_dict(checkpoint['model_state_dict'])
+                model.load_state_dict(checkpoint["model_state_dict"])
 
                 # Evaluate on validation and test sets
                 val_metrics = self.evaluate_model(model, val_loader, max_batches)
@@ -143,24 +146,26 @@ class ModelEvaluator:
 
                 # Collect results
                 result = {
-                    'checkpoint_path': checkpoint_path,
-                    'step': checkpoint.get('step', 0),
-                    'epoch': checkpoint.get('epoch', 0),
-                    'model_params': model.count_parameters(),
-                    'd_model': model_config['d_model'],
-                    'n_layers': model_config['n_layers'],
-                    'n_heads': model_config['n_heads'],
-                    'val_loss': val_metrics['loss'],
-                    'val_perplexity': val_metrics['perplexity'],
-                    'val_accuracy': val_metrics['accuracy'],
-                    'test_loss': test_metrics['loss'],
-                    'test_perplexity': test_metrics['perplexity'],
-                    'test_accuracy': test_metrics['accuracy']
+                    "checkpoint_path": checkpoint_path,
+                    "step": checkpoint.get("step", 0),
+                    "epoch": checkpoint.get("epoch", 0),
+                    "model_params": model.count_parameters(),
+                    "d_model": model_config["d_model"],
+                    "n_layers": model_config["n_layers"],
+                    "n_heads": model_config["n_heads"],
+                    "val_loss": val_metrics["loss"],
+                    "val_perplexity": val_metrics["perplexity"],
+                    "val_accuracy": val_metrics["accuracy"],
+                    "test_loss": test_metrics["loss"],
+                    "test_perplexity": test_metrics["perplexity"],
+                    "test_accuracy": test_metrics["accuracy"],
                 }
 
                 results.append(result)
-                print(f"Evaluated {checkpoint_path}: val_loss={val_metrics['loss']:.4f}, "
-                      f"test_loss={test_metrics['loss']:.4f}")
+                print(
+                    f"Evaluated {checkpoint_path}: val_loss={val_metrics['loss']:.4f}, "
+                    f"test_loss={test_metrics['loss']:.4f}"
+                )
 
             except Exception as e:
                 print(f"Error evaluating {checkpoint_path}: {e}")
@@ -169,9 +174,7 @@ class ModelEvaluator:
         return pd.DataFrame(results)
 
     def compute_scaling_laws(
-        self,
-        results_df: pd.DataFrame,
-        save_path: Optional[str] = None
+        self, results_df: pd.DataFrame, save_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Compute scaling law relationships from evaluation results.
@@ -183,6 +186,7 @@ class ModelEvaluator:
         Returns:
             Dictionary with scaling law parameters and plots
         """
+
         def power_law(x, a, b):
             """Power law function: y = a * x^b"""
             return a * np.power(x, b)
@@ -190,53 +194,68 @@ class ModelEvaluator:
         scaling_results = {}
 
         # Group by different scaling dimensions
-        if 'd_model' in results_df.columns and len(results_df['d_model'].unique()) > 1:
+        if "d_model" in results_df.columns and len(results_df["d_model"].unique()) > 1:
             # Scaling with model width
-            width_data = results_df.groupby('d_model').agg({
-                'test_loss': 'mean',
-                'test_perplexity': 'mean',
-                'model_params': 'first'
-            }).reset_index()
+            width_data = (
+                results_df.groupby("d_model")
+                .agg(
+                    {
+                        "test_loss": "mean",
+                        "test_perplexity": "mean",
+                        "model_params": "first",
+                    }
+                )
+                .reset_index()
+            )
 
             try:
                 # Fit power law: loss = a * params^b
                 popt, pcov = curve_fit(
                     power_law,
-                    width_data['model_params'],
-                    width_data['test_loss'],
-                    p0=[1.0, -0.1]
+                    width_data["model_params"],
+                    width_data["test_loss"],
+                    p0=[1.0, -0.1],
                 )
-                scaling_results['width_scaling'] = {
-                    'params': popt.tolist(),
-                    'r_squared': self._compute_r_squared(
-                        width_data['test_loss'],
-                        power_law(width_data['model_params'], *popt)
-                    )
+                scaling_results["width_scaling"] = {
+                    "params": popt.tolist(),
+                    "r_squared": self._compute_r_squared(
+                        width_data["test_loss"],
+                        power_law(width_data["model_params"], *popt),
+                    ),
                 }
             except Exception as e:
                 print(f"Error fitting width scaling law: {e}")
 
         # Scaling with number of layers
-        if 'n_layers' in results_df.columns and len(results_df['n_layers'].unique()) > 1:
-            layer_data = results_df.groupby('n_layers').agg({
-                'test_loss': 'mean',
-                'test_perplexity': 'mean',
-                'model_params': 'first'
-            }).reset_index()
+        if (
+            "n_layers" in results_df.columns
+            and len(results_df["n_layers"].unique()) > 1
+        ):
+            layer_data = (
+                results_df.groupby("n_layers")
+                .agg(
+                    {
+                        "test_loss": "mean",
+                        "test_perplexity": "mean",
+                        "model_params": "first",
+                    }
+                )
+                .reset_index()
+            )
 
             try:
                 popt, pcov = curve_fit(
                     power_law,
-                    layer_data['model_params'],
-                    layer_data['test_loss'],
-                    p0=[1.0, -0.1]
+                    layer_data["model_params"],
+                    layer_data["test_loss"],
+                    p0=[1.0, -0.1],
                 )
-                scaling_results['depth_scaling'] = {
-                    'params': popt.tolist(),
-                    'r_squared': self._compute_r_squared(
-                        layer_data['test_loss'],
-                        power_law(layer_data['model_params'], *popt)
-                    )
+                scaling_results["depth_scaling"] = {
+                    "params": popt.tolist(),
+                    "r_squared": self._compute_r_squared(
+                        layer_data["test_loss"],
+                        power_law(layer_data["model_params"], *popt),
+                    ),
                 }
             except Exception as e:
                 print(f"Error fitting depth scaling law: {e}")
@@ -254,92 +273,102 @@ class ModelEvaluator:
         return 1 - (ss_res / ss_tot)
 
     def _plot_scaling_laws(
-        self,
-        results_df: pd.DataFrame,
-        scaling_results: Dict[str, Any],
-        save_path: str
+        self, results_df: pd.DataFrame, scaling_results: Dict[str, Any], save_path: str
     ):
         """Create and save scaling law plots."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        fig.suptitle('TinyGPT Scaling Laws', fontsize=16)
+        fig.suptitle("TinyGPT Scaling Laws", fontsize=16)
 
         # Plot 1: Loss vs Model Parameters
         if not results_df.empty:
             ax = axes[0, 0]
             scatter = ax.scatter(
-                results_df['model_params'],
-                results_df['test_loss'],
-                c=results_df['d_model'],
-                cmap='viridis',
-                alpha=0.7
+                results_df["model_params"],
+                results_df["test_loss"],
+                c=results_df["d_model"],
+                cmap="viridis",
+                alpha=0.7,
             )
-            ax.set_xlabel('Model Parameters')
-            ax.set_ylabel('Test Loss')
-            ax.set_title('Test Loss vs Model Parameters')
-            ax.set_xscale('log')
-            ax.set_yscale('log')
-            plt.colorbar(scatter, ax=ax, label='d_model')
+            ax.set_xlabel("Model Parameters")
+            ax.set_ylabel("Test Loss")
+            ax.set_title("Test Loss vs Model Parameters")
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            plt.colorbar(scatter, ax=ax, label="d_model")
 
             # Add power law fit if available
-            if 'width_scaling' in scaling_results:
-                params = scaling_results['width_scaling']['params']
+            if "width_scaling" in scaling_results:
+                params = scaling_results["width_scaling"]["params"]
                 x_fit = np.logspace(
-                    np.log10(results_df['model_params'].min()),
-                    np.log10(results_df['model_params'].max()),
-                    100
+                    np.log10(results_df["model_params"].min()),
+                    np.log10(results_df["model_params"].max()),
+                    100,
                 )
                 y_fit = params[0] * np.power(x_fit, params[1])
-                ax.plot(x_fit, y_fit, 'r--', alpha=0.8,
-                       label=f'Power law: {params[0]:.3f} * N^{params[1]:.3f}')
+                ax.plot(
+                    x_fit,
+                    y_fit,
+                    "r--",
+                    alpha=0.8,
+                    label=f"Power law: {params[0]:.3f} * N^{params[1]:.3f}",
+                )
                 ax.legend()
 
         # Plot 2: Perplexity vs Model Parameters
         ax = axes[0, 1]
         if not results_df.empty:
             ax.scatter(
-                results_df['model_params'],
-                results_df['test_perplexity'],
-                c=results_df['n_layers'],
-                cmap='plasma',
-                alpha=0.7
+                results_df["model_params"],
+                results_df["test_perplexity"],
+                c=results_df["n_layers"],
+                cmap="plasma",
+                alpha=0.7,
             )
-            ax.set_xlabel('Model Parameters')
-            ax.set_ylabel('Test Perplexity')
-            ax.set_title('Test Perplexity vs Model Parameters')
-            ax.set_xscale('log')
+            ax.set_xlabel("Model Parameters")
+            ax.set_ylabel("Test Perplexity")
+            ax.set_title("Test Perplexity vs Model Parameters")
+            ax.set_xscale("log")
 
         # Plot 3: Loss vs Width (d_model)
         ax = axes[1, 0]
-        if 'd_model' in results_df.columns:
-            width_means = results_df.groupby('d_model')['test_loss'].agg(['mean', 'std']).reset_index()
-            ax.errorbar(
-                width_means['d_model'],
-                width_means['mean'],
-                yerr=width_means['std'],
-                marker='o',
-                capsize=5
+        if "d_model" in results_df.columns:
+            width_means = (
+                results_df.groupby("d_model")["test_loss"]
+                .agg(["mean", "std"])
+                .reset_index()
             )
-            ax.set_xlabel('Model Width (d_model)')
-            ax.set_ylabel('Test Loss')
-            ax.set_title('Test Loss vs Model Width')
+            ax.errorbar(
+                width_means["d_model"],
+                width_means["mean"],
+                yerr=width_means["std"],
+                marker="o",
+                capsize=5,
+            )
+            ax.set_xlabel("Model Width (d_model)")
+            ax.set_ylabel("Test Loss")
+            ax.set_title("Test Loss vs Model Width")
 
         # Plot 4: Loss vs Depth (n_layers)
         ax = axes[1, 1]
-        if 'n_layers' in results_df.columns:
-            depth_means = results_df.groupby('n_layers')['test_loss'].agg(['mean', 'std']).reset_index()
-            ax.errorbar(
-                depth_means['n_layers'],
-                depth_means['mean'],
-                yerr=depth_means['std'],
-                marker='s',
-                capsize=5
+        if "n_layers" in results_df.columns:
+            depth_means = (
+                results_df.groupby("n_layers")["test_loss"]
+                .agg(["mean", "std"])
+                .reset_index()
             )
-            ax.set_xlabel('Model Depth (n_layers)')
-            ax.set_ylabel('Test Loss')
-            ax.set_title('Test Loss vs Model Depth')
+            ax.errorbar(
+                depth_means["n_layers"],
+                depth_means["mean"],
+                yerr=depth_means["std"],
+                marker="s",
+                capsize=5,
+            )
+            ax.set_xlabel("Model Depth (n_layers)")
+            ax.set_ylabel("Test Loss")
+            ax.set_title("Test Loss vs Model Depth")
 
         plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
         plt.close()
         print(f"Scaling law plots saved to {save_path}")
 
@@ -350,7 +379,7 @@ class ModelEvaluator:
         prompts: List[str],
         max_new_tokens: int = 100,
         temperature: float = 0.8,
-        num_samples: int = 3
+        num_samples: int = 3,
     ) -> List[Dict[str, Any]]:
         """Generate text samples from the model."""
         model.eval()
@@ -365,7 +394,7 @@ class ModelEvaluator:
                 # Encode prompt
                 input_ids = torch.tensor(
                     tokenizer.encode(prompt, add_special_tokens=False),
-                    device=self.device
+                    device=self.device,
                 ).unsqueeze(0)
 
                 # Generate
@@ -374,24 +403,23 @@ class ModelEvaluator:
                         input_ids,
                         max_new_tokens=max_new_tokens,
                         temperature=temperature,
-                        do_sample=True
+                        do_sample=True,
                     )
 
                 # Decode
-                generated_text = tokenizer.decode(generated[0], skip_special_tokens=True)
+                generated_text = tokenizer.decode(
+                    generated[0], skip_special_tokens=True
+                )
                 prompt_samples.append(generated_text)
 
-            samples.append({
-                'prompt': prompt,
-                'samples': prompt_samples
-            })
+            samples.append({"prompt": prompt, "samples": prompt_samples})
 
         return samples
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load configuration from YAML file."""
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     return config
 
@@ -405,10 +433,21 @@ def find_checkpoints(checkpoint_dir: str, pattern: str = "*.pt") -> List[str]:
 def main():
     parser = argparse.ArgumentParser(description="Evaluate TinyGPT models")
     parser.add_argument("--config", type=str, required=True, help="Path to config file")
-    parser.add_argument("--checkpoint_dir", type=str, required=True, help="Directory containing checkpoints")
-    parser.add_argument("--output_dir", type=str, default="results", help="Output directory for results")
-    parser.add_argument("--max_batches", type=int, default=None, help="Maximum batches for evaluation")
-    parser.add_argument("--generate_samples", action="store_true", help="Generate text samples")
+    parser.add_argument(
+        "--checkpoint_dir",
+        type=str,
+        required=True,
+        help="Directory containing checkpoints",
+    )
+    parser.add_argument(
+        "--output_dir", type=str, default="results", help="Output directory for results"
+    )
+    parser.add_argument(
+        "--max_batches", type=int, default=None, help="Maximum batches for evaluation"
+    )
+    parser.add_argument(
+        "--generate_samples", action="store_true", help="Generate text samples"
+    )
 
     args = parser.parse_args()
 
@@ -446,13 +485,12 @@ def main():
 
     # Compute scaling laws
     scaling_results = evaluator.compute_scaling_laws(
-        results_df,
-        save_path=str(output_dir / "scaling_laws.png")
+        results_df, save_path=str(output_dir / "scaling_laws.png")
     )
 
     # Save scaling law results
     scaling_path = output_dir / "scaling_laws.json"
-    with open(scaling_path, 'w') as f:
+    with open(scaling_path, "w") as f:
         json.dump(scaling_results, f, indent=2)
     print(f"Scaling law results saved to {scaling_path}")
 
@@ -461,13 +499,15 @@ def main():
         print("Generating text samples...")
 
         # Load best model
-        best_model_path = results_df.loc[results_df['test_loss'].idxmin(), 'checkpoint_path']
-        checkpoint = torch.load(best_model_path, map_location='cpu')
-        model = TinyGPT(**checkpoint['config']['model'])
-        model.load_state_dict(checkpoint['model_state_dict'])
+        best_model_path = results_df.loc[
+            results_df["test_loss"].idxmin(), "checkpoint_path"
+        ]
+        checkpoint = torch.load(best_model_path, map_location="cpu")
+        model = TinyGPT(**checkpoint["config"]["model"])
+        model.load_state_dict(checkpoint["model_state_dict"])
 
         # Set up tokenizer
-        data_module = create_datamodule(**config['data'])
+        data_module = create_datamodule(**config["data"])
         data_module.prepare_data()
         data_module.setup_tokenizer()
 
@@ -477,16 +517,14 @@ def main():
             "The little girl",
             "In a magical forest",
             "The brave knight",
-            "On a sunny day"
+            "On a sunny day",
         ]
 
-        samples = evaluator.generate_text_samples(
-            model, data_module.tokenizer, prompts
-        )
+        samples = evaluator.generate_text_samples(model, data_module.tokenizer, prompts)
 
         # Save samples
         samples_path = output_dir / "text_samples.json"
-        with open(samples_path, 'w') as f:
+        with open(samples_path, "w") as f:
             json.dump(samples, f, indent=2, ensure_ascii=False)
         print(f"Text samples saved to {samples_path}")
 
