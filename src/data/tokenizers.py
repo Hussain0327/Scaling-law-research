@@ -4,7 +4,6 @@ Supports both character-level and subword tokenization.
 """
 
 import json
-import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 

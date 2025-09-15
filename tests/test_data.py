@@ -2,24 +2,23 @@
 Unit tests for data loading and tokenization modules.
 """
 
-import json
 import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-import torch
-
 sys.path.append("src")
 
-from data.datamodule import (
+import pytest  # noqa: E402
+import torch  # noqa: E402
+
+from data.datamodule import (  # noqa: E402
     SimpleTextDataModule,
     TextDataset,
     TinyStoriesDataModule,
     create_datamodule,
 )
-from data.tokenizers import (
+from data.tokenizers import (  # noqa: E402
     CharacterTokenizer,
     SubwordTokenizer,
     collate_fn,

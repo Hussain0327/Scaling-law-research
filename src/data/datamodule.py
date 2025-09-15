@@ -3,14 +3,9 @@ Data loading and preprocessing for TinyGPT training.
 Supports TinyStories and other text datasets.
 """
 
-import json
 import random
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
-import numpy as np
-import torch
-from datasets import Dataset as HFDataset
 from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
 

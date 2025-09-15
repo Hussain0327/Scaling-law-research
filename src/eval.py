@@ -5,21 +5,18 @@ Includes metrics computation, scaling law analysis, and curve plotting.
 
 import argparse
 import json
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import torch
-import torch.nn.functional as F
 import yaml
 from scipy.optimize import curve_fit
 from tqdm import tqdm
 
-from data.datamodule import create_datamodule, get_dataset_stats
+from data.datamodule import create_datamodule
 from models.tiny_gpt import TinyGPT
 
 

@@ -4,16 +4,14 @@ Includes gradient checks and architectural validation.
 """
 
 import sys
-from typing import Tuple
-
-import numpy as np
-import pytest
-import torch
-import torch.nn as nn
 
 sys.path.append("src")
 
-from models.tiny_gpt import (
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+import torch  # noqa: E402
+
+from models.tiny_gpt import (  # noqa: E402
     MLP,
     MultiHeadAttention,
     TinyGPT,
@@ -224,7 +222,7 @@ class TestTinyGPT:
         # Embeddings: token + position
         embedding_params = vocab_size * d_model + max_seq_len * d_model
 
-        # Each layer: attention (4 linear layers) + MLP (2 linear layers) + 2 layer norms
+        # Each layer: attention (4 linear) + MLP (2 linear) + 2 layer norms
         attn_params = 4 * d_model * d_model  # q, k, v, out projections
         mlp_params = d_model * (4 * d_model) + (4 * d_model) * d_model  # fc1 + fc2
         ln_params = 2 * d_model * 2  # 2 layer norms, each with weight and bias
@@ -308,7 +306,8 @@ class TestTinyGPT:
         relative_error = max_error / torch.max(torch.abs(analytical_grad))
 
         print(
-            f"Gradient check - Max error: {max_error:.2e}, Relative error: {relative_error:.2e}"
+            f"Gradient check - Max error: {max_error:.2e}, "
+            f"Relative error: {relative_error:.2e}"
         )
         assert (
             relative_error < 1e-3
@@ -337,8 +336,6 @@ class TestTinyGPT:
     def test_causal_language_modeling_loss(self, model_config):
         """Test that the model correctly computes causal LM loss."""
         model = TinyGPT(**model_config)
-        batch_size, seq_len = 2, 6
-
         # Create simple sequence: [1, 2, 3, 4, 5, 0]
         input_ids = torch.tensor([[1, 2, 3, 4, 5, 0], [2, 3, 4, 5, 0, 1]])
 

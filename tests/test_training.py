@@ -7,14 +7,14 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-import torch
-import yaml
-
 sys.path.append("src")
 
-from models.tiny_gpt import TinyGPT
-from train import Trainer, load_config, setup_experiment
+import pytest  # noqa: E402
+import torch  # noqa: E402
+import yaml  # noqa: E402
+
+from models.tiny_gpt import TinyGPT  # noqa: E402
+from train import Trainer, load_config, setup_experiment  # noqa: E402
 
 
 class TestTrainer:
@@ -206,7 +206,7 @@ class TestTrainer:
         model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
 
-        trainer = Trainer(
+        trainer = Trainer(  # noqa: F841 # Used for side effects (wandb init)
             model=model,
             train_dataloader=train_loader,
             val_dataloader=val_loader,

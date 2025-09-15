@@ -5,21 +5,19 @@ Supports various model sizes and configurations for research.
 
 import argparse
 import json
-import os
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 import wandb
 import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from data.datamodule import create_datamodule, get_dataset_stats
-from models.tiny_gpt import TinyGPT, create_tiny_gpt
+from models.tiny_gpt import TinyGPT
 
 
 class Trainer:
@@ -94,7 +92,10 @@ class Trainer:
         wandb.init(
             project="tiny-lm-scaling",
             config=self.config,
-            name=f"tinygpt_{self.config['model']['d_model']}d_{self.config['model']['n_layers']}l",
+            name=(
+                f"tinygpt_{self.config['model']['d_model']}d"
+                f"_{self.config['model']['n_layers']}l"
+            ),
         )
         wandb.watch(self.model, log="all", log_freq=1000)
 
@@ -260,7 +261,8 @@ class Trainer:
                         wandb.log(log_data)
 
                     print(
-                        f"Step {self.step}: loss={avg_loss:.4f}, lr={lr:.2e}, tokens/s={tokens_per_sec:.1f}"
+                        f"Step {self.step}: loss={avg_loss:.4f}, lr={lr:.2e}, "
+                        f"tokens/s={tokens_per_sec:.1f}"
                     )
                     running_loss = 0.0
                     start_time = time.time()
@@ -329,7 +331,8 @@ def setup_experiment(config: Dict[str, Any]) -> Tuple[TinyGPT, DataLoader, DataL
     if hasattr(data_module.tokenizer, "vocab_size"):
         if model.vocab_size != data_module.tokenizer.vocab_size:
             print(
-                f"Updating model vocab size from {model.vocab_size} to {data_module.tokenizer.vocab_size}"
+                f"Updating model vocab size from {model.vocab_size} to "
+                f"{data_module.tokenizer.vocab_size}"
             )
             # Recreate model with correct vocab size
             config["model"]["vocab_size"] = data_module.tokenizer.vocab_size

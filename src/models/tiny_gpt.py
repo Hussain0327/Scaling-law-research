@@ -1,6 +1,7 @@
 """
 TinyGPT: A minimal GPT implementation from scratch.
-Implements transformer architecture with multi-head attention, MLP blocks, and layer normalization.
+Implements transformer architecture with multi-head attention, MLP blocks,
+and layer normalization.
 """
 
 import math
