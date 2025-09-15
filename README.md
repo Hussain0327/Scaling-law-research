@@ -146,12 +146,18 @@ data/
 Ai-Research/
 ├── src/
 │   ├── models/
+│   │   ├── __init__.py         # Model components exports
 │   │   └── tiny_gpt.py         # GPT blocks, attention, MLP, LayerNorm
 │   ├── data/
-│   │   ├── datamodule.py       # PyTorch Lightning data handling
-│   │   └── tokenizers.py       # BPE and character tokenizers
+│   │   ├── __init__.py         # Data components exports
+│   │   ├── datamodule.py       # PyTorch data handling and datasets
+│   │   └── tokenizers.py       # Character and subword tokenizers
+│   ├── utils/
+│   │   ├── __init__.py         # Utility exports
+│   │   ├── config.py           # Configuration loading utilities
+│   │   └── logging.py          # Centralized logging setup
 │   ├── train.py                # Training loop, logging, checkpoints
-│   └── eval.py                 # Metrics, perplexity, table export
+│   └── eval.py                 # Metrics, perplexity, evaluation
 ├── configs/                    # YAML configurations
 │   ├── base_config.yaml        # Default hyperparameters
 │   ├── scaling_width.yaml      # Model size experiments
@@ -162,14 +168,16 @@ Ai-Research/
 │   ├── run_sweep.py           # Experiment orchestration
 │   ├── analyze_scaling.py     # Results analysis and plotting
 │   └── export_model.py        # Model export utilities
-├── tests/                     # Unit tests with pytest
-│   ├── test_models.py
-│   ├── test_training.py
-│   └── test_data.py
+├── tests/                     # Comprehensive unit tests with pytest
+│   ├── test_models.py         # Model architecture and gradient tests
+│   ├── test_training.py       # Training loop and trainer tests
+│   └── test_data.py           # Data loading and tokenization tests
 ├── results/                   # Generated plots and tables
 ├── .github/workflows/         # CI/CD pipeline
+│   └── ci.yml                 # Multi-platform testing and linting
 ├── Makefile                   # Automation commands
-└── pyproject.toml            # Dependencies and project config
+├── pyproject.toml            # Dependencies and project config
+└── README.md                 # This documentation
 ```
 
 ## Scaling Law Results
