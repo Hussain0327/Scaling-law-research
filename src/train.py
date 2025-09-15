@@ -20,6 +20,14 @@ from data.datamodule import create_datamodule, get_dataset_stats
 from models.tiny_gpt import TinyGPT
 
 
+def load_config(config_path: str) -> dict:
+    with open(config_path, "r") as f:
+        if config_path.endswith(".yaml") or config_path.endswith(".yml"):
+            return yaml.safe_load(f)
+        else:
+            return json.load(f)
+
+
 class Trainer:
     """Training class for TinyGPT models."""
 
