@@ -1,0 +1,43 @@
+# Configuration for model width scaling experiments
+# Sweeps across different model widths (d_model)
+
+model:
+  vocab_size: 50257
+  d_model: 64  # Will be swept: [64, 128, 256]
+  n_layers: 6
+  n_heads: 4  # Adjusted to be divisible by d_model
+  max_seq_len: 256
+  dropout: 0.1
+
+data:
+  dataset_name: "tinystories"
+  tokenizer_type: "char"
+  max_length: 256
+  stride: 128
+  batch_size: 32
+  num_workers: 4
+  max_samples: 5000
+  data_fraction: 0.05
+  seed: 42
+
+training:
+  num_epochs: 2
+  learning_rate: 3e-4
+  weight_decay: 0.01
+  warmup_steps: 50
+  max_grad_norm: 1.0
+  use_amp: true
+  eval_interval: 100
+  save_interval: 300
+  log_interval: 25
+
+experiment:
+  name: "width_scaling"
+  description: "Model width scaling experiment"
+  tags: ["scaling", "width", "d_model"]
+
+# Sweep parameters
+sweep:
+  parameter: "d_model"
+  values: [64, 128, 256]
+  adjust_heads: true  # Automatically adjust n_heads to be divisible

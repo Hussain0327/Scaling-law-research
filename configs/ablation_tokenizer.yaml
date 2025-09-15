@@ -1,0 +1,42 @@
+# Configuration for tokenizer ablation study
+# Compares character vs subword tokenization
+
+model:
+  vocab_size: 50257  # Will be adjusted based on tokenizer
+  d_model: 128
+  n_layers: 6
+  n_heads: 8
+  max_seq_len: 256
+  dropout: 0.1
+
+data:
+  dataset_name: "tinystories"
+  tokenizer_type: "char"  # Will be swept: ["char", "subword"]
+  max_length: 256
+  stride: 128
+  batch_size: 32
+  num_workers: 4
+  max_samples: 5000
+  data_fraction: 0.05
+  seed: 42
+
+training:
+  num_epochs: 3
+  learning_rate: 3e-4
+  weight_decay: 0.01
+  warmup_steps: 100
+  max_grad_norm: 1.0
+  use_amp: true
+  eval_interval: 150
+  save_interval: 400
+  log_interval: 50
+
+experiment:
+  name: "tokenizer_ablation"
+  description: "Character vs subword tokenizer comparison"
+  tags: ["ablation", "tokenizer", "char_vs_subword"]
+
+# Sweep parameters
+sweep:
+  parameter: "tokenizer_type"
+  values: ["char", "subword"]

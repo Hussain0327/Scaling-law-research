@@ -1,0 +1,375 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual triggering
+
+env:
+  PYTHON_VERSION: "3.9"
+  TORCH_VERSION: "2.0.0"
+
+jobs:
+  lint-and-format:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort flake8 mypy
+
+    - name: Check code formatting with Black
+      run: black --check --diff src tests
+
+    - name: Check import sorting with isort
+      run: isort --check-only --diff src tests
+
+    - name: Lint with flake8
+      run: |
+        flake8 src tests --max-line-length=88 --extend-ignore=E203,W503 --count --statistics
+
+    - name: Type check with mypy
+      run: mypy src --ignore-missing-imports
+      continue-on-error: true  # Type checking is advisory for now
+
+  test:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        exclude:
+          # Reduce matrix size for faster CI
+          - os: macos-latest
+            python-version: "3.8"
+          - os: macos-latest
+            python-version: "3.10"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run unit tests
+      run: |
+        cd src && python -m pytest ../tests -v --cov=. --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.9'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./src/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, test]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-integration-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-integration-
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Create necessary directories
+      run: |
+        mkdir -p checkpoints results
+
+    - name: Run smoke test
+      run: make smoke-test
+      env:
+        WANDB_MODE: disabled
+
+    - name: Test model creation and basic forward pass
+      run: |
+        cd src
+        python -c "
+        from models.tiny_gpt import create_tiny_gpt
+        import torch
+
+        model = create_tiny_gpt(vocab_size=100, d_model=32, n_layers=2, n_heads=4)
+        x = torch.randint(0, 100, (1, 10))
+        logits, _ = model(x)
+        print(f'Model created successfully with {model.count_parameters()} parameters')
+        print(f'Output shape: {logits.shape}')
+        "
+
+    - name: Test data loading
+      run: |
+        cd src
+        python -c "
+        from data.tokenizers import CharacterTokenizer
+        from data.datamodule import TextDataset
+
+        tokenizer = CharacterTokenizer()
+        tokenizer.build_vocab(['hello world', 'test'])
+
+        dataset = TextDataset(['hello'], tokenizer, max_length=10, stride=5)
+        print(f'Dataset created with {len(dataset)} samples')
+        "
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit
+
+    - name: Run safety check for known vulnerabilities
+      run: safety check --json --output safety-report.json || true
+
+    - name: Run bandit security linter
+      run: bandit -r src -f json -o bandit-report.json || true
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          bandit-report.json
+
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install documentation dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install sphinx sphinx-rtd-theme
+
+    - name: Generate API documentation
+      run: |
+        cd src
+        python -c "
+        import os
+        import inspect
+        from models.tiny_gpt import TinyGPT
+        from data.datamodule import TinyStoriesDataModule
+
+        # Generate simple API docs
+        with open('../docs/API.md', 'w') as f:
+            f.write('# API Documentation\n\n')
+            f.write('## TinyGPT Model\n\n')
+            f.write(f'{TinyGPT.__doc__}\n\n')
+            f.write('## Data Module\n\n')
+            f.write(f'{TinyStoriesDataModule.__doc__}\n\n')
+        "
+      continue-on-error: true
+
+  performance-check:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run performance benchmarks
+      run: |
+        cd src
+        python -c "
+        import time
+        import torch
+        from models.tiny_gpt import create_tiny_gpt
+
+        # Benchmark model creation and forward pass
+        start = time.time()
+        model = create_tiny_gpt(vocab_size=1000, d_model=128, n_layers=6, n_heads=8)
+        creation_time = time.time() - start
+
+        x = torch.randint(0, 1000, (4, 64))
+
+        # Warmup
+        for _ in range(5):
+            _ = model(x)
+
+        # Benchmark forward pass
+        start = time.time()
+        for _ in range(10):
+            logits, _ = model(x)
+        forward_time = (time.time() - start) / 10
+
+        print(f'Model creation time: {creation_time:.4f}s')
+        print(f'Average forward pass time: {forward_time:.4f}s')
+        print(f'Model parameters: {model.count_parameters():,}')
+
+        # Performance thresholds
+        assert creation_time < 1.0, f'Model creation too slow: {creation_time:.4f}s'
+        assert forward_time < 0.1, f'Forward pass too slow: {forward_time:.4f}s'
+        "
+
+  gpu-test:
+    name: GPU Tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Test CUDA compatibility (CPU fallback)
+      run: |
+        cd src
+        python -c "
+        import torch
+        from models.tiny_gpt import create_tiny_gpt
+
+        print(f'CUDA available: {torch.cuda.is_available()}')
+        print(f'CUDA devices: {torch.cuda.device_count()}')
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f'Using device: {device}')
+
+        model = create_tiny_gpt(vocab_size=100, d_model=64, n_layers=2, n_heads=4)
+        model = model.to(device)
+
+        x = torch.randint(0, 100, (2, 16)).to(device)
+        logits, _ = model(x)
+
+        print(f'GPU test passed. Output shape: {logits.shape}')
+        "
+
+  # Conditional deployment job
+  deploy:
+    name: Deploy Artifacts
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, test, integration-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+
+    - name: Build package
+      run: python -m build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package
+        path: dist/
+
+    - name: Generate release notes
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        echo "# Release Notes" > release_notes.md
+        echo "" >> release_notes.md
+        echo "## What's New" >> release_notes.md
+        echo "- TinyGPT implementation with scaling law experiments" >> release_notes.md
+        echo "- Comprehensive test suite and CI/CD pipeline" >> release_notes.md
+        echo "- Reproducible research framework" >> release_notes.md
+
+  # Cleanup job
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, test, integration-test, security-scan]
+    if: always()
+    steps:
+    - name: Clean up workflow artifacts
+      run: echo "Workflow completed. Check results in previous jobs."
