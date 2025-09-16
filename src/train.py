@@ -15,7 +15,7 @@ import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data.datamodule import create_datamodule, get_dataset_stats
+from data import datamodule as data_datamodule
 from models.tiny_gpt import TinyGPT
 
 
@@ -171,8 +171,11 @@ class Trainer:
             total_loss += loss.item() * valid_tokens
             total_tokens += valid_tokens
 
+        if total_tokens == 0:
+            return {"val_loss": float("inf"), "val_perplexity": float("inf")}
+
         avg_loss = total_loss / total_tokens
-        avg_perplexity = np.exp(avg_loss)
+        avg_perplexity = float(np.exp(avg_loss))
 
         return {"val_loss": avg_loss, "val_perplexity": avg_perplexity}
 
@@ -333,7 +336,7 @@ def setup_experiment(config: Dict[str, Any]) -> Tuple[TinyGPT, DataLoader, DataL
     print(f"Created model with {model.count_parameters():,} parameters")
 
     # Create data module
-    data_module = create_datamodule(**config["data"])
+    data_module = data_datamodule.create_datamodule(**config["data"])
     data_module.prepare_data()
     data_module.setup_tokenizer()
     data_module.setup_datasets()
@@ -354,7 +357,7 @@ def setup_experiment(config: Dict[str, Any]) -> Tuple[TinyGPT, DataLoader, DataL
     val_loader = data_module.val_dataloader()
 
     # Print dataset statistics
-    train_stats = get_dataset_stats(train_loader)
+    train_stats = data_datamodule.get_dataset_stats(train_loader)
     print(f"Training set: {train_stats}")
 
     return model, train_loader, val_loader
