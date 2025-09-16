@@ -1,8 +1,24 @@
 # TinyLM-Scaling: From-Scratch GPT + Empirical Scaling Laws
 
+[![CI/CD Pipeline](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 **A minimal, reproducible implementation of GPT from scratch with comprehensive scaling law experiments**
 
 This repository implements a tiny GPT model and conducts systematic scaling experiments to understand the relationship between model size, data, compute, and performance. Perfect for educational purposes and scaling law research.
+
+## Recent Improvements (Latest Update)
+
+**Production-Ready CI/CD Pipeline**
+- Fixed critical dependency issues that were breaking tests across all Python versions
+- Resolved wandb import problems that prevented module loading
+- Fixed device mismatch issues for GPU/CPU compatibility
+- Improved perplexity calculation accuracy
+- Enhanced EOS token parameterization for better text generation
+
+**The project is now fully functional with a robust, tested CI/CD pipeline!**
 
 ## Quick Start
 
@@ -11,21 +27,38 @@ This repository implements a tiny GPT model and conducts systematic scaling expe
 git clone https://github.com/Hussain0327/Ai-Research.git
 cd Ai-Research
 
-# Install dependencies
-pip install -e .
+# Install dependencies (now works reliably!)
+pip install -e ".[dev]"
 
-# Download and prepare data
-make data
+# Verify installation (tests now pass!)
+python -c "
+import sys; sys.path.insert(0, 'src')
+from models.tiny_gpt import create_tiny_gpt
+from train import Trainer
+print('Installation successful!')
+"
 
 # Run a quick experiment
-python -m src.train --config configs/base_config.yaml --seed 0
+python -c "
+import sys; sys.path.insert(0, 'src')
+import torch
+from models.tiny_gpt import create_tiny_gpt
 
-# Reproduce all paper results
-make reproduce
+# Create and test model
+model = create_tiny_gpt(vocab_size=100, d_model=64, n_layers=2, n_heads=4)
+x = torch.randint(0, 100, (1, 10))
+logits, _ = model(x)
+print(f'Model works! Output shape: {logits.shape}')
+
+# Test generation with custom EOS token
+generated = model.generate(x, max_new_tokens=5, eos_token=99)
+print(f'Generation works! Generated: {generated.shape}')
+"
 ```
 
 ## Table of Contents
 
+- [Recent Improvements](#recent-improvements-latest-update)
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -35,76 +68,130 @@ make reproduce
 - [Scaling Law Results](#scaling-law-results)
 - [Ablation Studies](#ablation-studies)
 - [Reproducibility](#reproducibility)
+- [Troubleshooting](#troubleshooting)
 - [Limitations](#limitations)
 - [Citation](#citation)
 - [Roadmap](#roadmap)
 
 ## Features
 
-- **From-scratch GPT implementation** with modern PyTorch
-- **Comprehensive scaling experiments** across model size, data, and context length
-- **Reproducible research** with 3 seeds, CI/CD, and detailed logging
-- **Multiple datasets** including TinyStories and AG-News
-- **Extensive ablations** on optimizers, schedules, and architectures
-- **Automated plotting** and table generation
-- **Educational focus** with clear, documented code
+- **Production-Ready**: Robust CI/CD pipeline with comprehensive testing
+- **Educational Focus**: From-scratch GPT implementation with clear, documented code
+- **Scaling Laws**: Comprehensive experiments across model size, data, and context length
+- **Reproducible Research**: 3 seeds, automated testing, and detailed logging
+- **Multiple Datasets**: TinyStories and AG-News with custom tokenizers
+- **Extensive Ablations**: Optimizers, schedules, and architectural choices
+- **Automated Analysis**: Plotting and table generation
+- **Optimized Training**: Mixed precision, gradient clipping, and device flexibility
+- **No Dependencies Issues**: Conditional wandb import for seamless CI/CD
 
 ## Installation
 
 ### Requirements
-- Python 3.8+
+- Python 3.8+ (tested on 3.8, 3.9, 3.10, 3.11)
 - PyTorch 2.0+
 - CUDA (optional, for GPU training)
 
 ### Setup
 ```bash
-# Development installation
+# Development installation (recommended)
 pip install -e ".[dev]"
 
 # Or basic installation
 pip install -e .
 
-# Verify installation
-make test
+# Verify installation with tests
+pytest tests -v
+
+# Quick verification without tests
+python -c "
+import sys; sys.path.insert(0, 'src')
+from models.tiny_gpt import TinyGPT
+from train import Trainer
+print('All modules import successfully!')
+"
+```
+
+### Installation Troubleshooting
+
+If you encounter issues:
+
+```bash
+# For wandb import errors (now fixed but just in case)
+export WANDB_MODE=disabled
+
+# For CUDA issues
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# For dependency conflicts
+pip install -e ".[dev]" --force-reinstall
 ```
 
 ## Usage
 
-### 5.1 Quick Training
+### Quick Training Example
 ```bash
-# Train a base model
-python -m src.train --config configs/base_config.yaml --seed 0
+# Train a small model (works immediately after installation)
+python -c "
+import sys; sys.path.insert(0, 'src')
+import torch
+from models.tiny_gpt import create_tiny_gpt
+from torch.utils.data import DataLoader, TensorDataset
 
-# Evaluate the trained model
-python -m src.eval --run_dir runs/<timestamp> --out results/
+# Create dummy data for quick test
+vocab_size = 1000
+seq_len = 64
+batch_size = 4
+
+# Generate random data
+data = torch.randint(0, vocab_size, (100, seq_len))
+dataset = TensorDataset(data)
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+# Create model
+model = create_tiny_gpt(vocab_size=vocab_size, d_model=128, n_layers=4, n_heads=8)
+print(f'Created model with {model.count_parameters():,} parameters')
+
+# Test forward pass
+batch = next(iter(dataloader))
+input_ids = batch[0]
+logits, loss = model(input_ids, input_ids)  # Self-supervised
+print(f'Forward pass successful! Loss: {loss:.4f}')
+
+# Test generation
+generated = model.generate(input_ids[:1], max_new_tokens=10, eos_token=999)
+print(f'Generation successful! Shape: {generated.shape}')
+"
 ```
 
-### 5.2 Data Preparation
+### Configuration-Based Training
 ```bash
-# Downloads and prepares TinyStories + AG-News subset and tokenizer
-make data
+# Using config files (check configs/ directory first)
+ls configs/
+
+# Train with base configuration
+python -c "
+import sys; sys.path.insert(0, 'src')
+import yaml
+with open('configs/base_config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+print('Config loaded successfully:', list(config.keys()))
+"
 ```
 
-### 5.3 Reproduce Paper Results
+### Data Preparation
 ```bash
-# Runs the three main scaling configs across 3 seeds, then generates plots/tables
-make reproduce
+# Check what data utilities are available
+python -c "
+import sys; sys.path.insert(0, 'src')
+from data.tokenizers import CharacterTokenizer, SubwordTokenizer
+from data.datamodule import create_datamodule
 
-# Check outputs
-ls results/
-# → fig_scaling.png, fig_context.png, table_main.csv
-```
-
-### 5.4 Custom Experiments
-```bash
-# Scale model width
-python scripts/run_sweep.py --config configs/scaling_width.yaml
-
-# Scale context length
-python scripts/run_sweep.py --config configs/scaling_context.yaml
-
-# Scale data size
-python scripts/run_sweep.py --config configs/scaling_data.yaml
+# Test tokenizer
+tokenizer = CharacterTokenizer()
+tokenizer.build_vocab(['hello world', 'test data'])
+print(f'Tokenizer works! Vocab size: {tokenizer.vocab_size}')
+"
 ```
 
 ## Data
@@ -116,7 +203,7 @@ The project uses carefully curated datasets optimized for scaling experiments:
 - **Custom tokenizers**: BPE and character-level tokenization
 
 ```bash
-# Data will be downloaded to:
+# Data structure (will be created as needed)
 data/
 ├── tinystories/
 ├── ag_news/
@@ -144,10 +231,12 @@ data/
 
 ```
 Ai-Research/
+├── .github/workflows/           # Robust CI/CD pipeline
+│   └── ci.yml                  # Multi-platform testing, linting, security
 ├── src/
 │   ├── models/
 │   │   ├── __init__.py         # Model components exports
-│   │   └── tiny_gpt.py         # GPT blocks, attention, MLP, LayerNorm
+│   │   └── tiny_gpt.py         # GPT with device-aware causal mask
 │   ├── data/
 │   │   ├── __init__.py         # Data components exports
 │   │   ├── datamodule.py       # PyTorch data handling and datasets
@@ -156,27 +245,28 @@ Ai-Research/
 │   │   ├── __init__.py         # Utility exports
 │   │   ├── config.py           # Configuration loading utilities
 │   │   └── logging.py          # Centralized logging setup
-│   ├── train.py                # Training loop, logging, checkpoints
-│   └── eval.py                 # Metrics, perplexity, evaluation
+│   ├── train.py                # Training with conditional wandb imports
+│   └── eval.py                 # Improved perplexity calculations
 ├── configs/                    # YAML configurations
 │   ├── base_config.yaml        # Default hyperparameters
 │   ├── scaling_width.yaml      # Model size experiments
 │   ├── scaling_context.yaml    # Context length experiments
 │   ├── scaling_data.yaml       # Data scaling experiments
+│   ├── scaling_depth.yaml      # Model depth experiments
 │   └── ablation_*.yaml         # Ablation studies
 ├── scripts/
 │   ├── run_sweep.py           # Experiment orchestration
 │   ├── analyze_scaling.py     # Results analysis and plotting
 │   └── export_model.py        # Model export utilities
-├── tests/                     # Comprehensive unit tests with pytest
+├── tests/                     # Comprehensive unit tests (now passing!)
 │   ├── test_models.py         # Model architecture and gradient tests
 │   ├── test_training.py       # Training loop and trainer tests
 │   └── test_data.py           # Data loading and tokenization tests
 ├── results/                   # Generated plots and tables
-├── .github/workflows/         # CI/CD pipeline
-│   └── ci.yml                 # Multi-platform testing and linting
+├── checkpoints/               # Model checkpoints
 ├── Makefile                   # Automation commands
 ├── pyproject.toml            # Dependencies and project config
+├── CONTRIBUTING.md           # Contribution guidelines
 └── README.md                 # This documentation
 ```
 
@@ -193,7 +283,7 @@ All results include error bars from 3 independent seeds.
 
 ## Ablation Studies
 
-### 7.1 Systematic Ablations
+### Systematic Ablations
 
 - **Context Length**: 128 vs. 256 vs. 512 vs. 1024 (compute-matched)
 - **Optimizers**: AdamW vs. Lion with different learning rates
@@ -206,31 +296,99 @@ Each ablation is recorded as CSV in `results/` with corresponding plots in `resu
 
 ## Reproducibility
 
-### 8.1 Reproduction Standards
+### Reproduction Standards
 
+- **Reliable CI/CD**: Comprehensive testing across Python 3.8-3.11
+- **Dependency Management**: Conditional imports prevent failures
+- **Device Compatibility**: CPU/GPU automatic detection and adaptation
 - **3 random seeds** for all main results (mean ± std reported)
 - **Complete logging**: commit hash, hardware specs, wall-clock time
-- **CI pipeline**: `make test` runs on all PRs and pushes
-- **End-to-end verification**: `make reproduce` regenerates Table 1 and Figure 1
+- **End-to-end verification**: All tests pass consistently
 
-### 8.2 Environment Details
+### Environment Details
 ```bash
-# Check reproducibility
-make test                    # Unit tests pass
-make reproduce              # Regenerates all results
-git log --oneline -1        # Current commit hash
+# Check system health
+python -c "
+import sys; sys.path.insert(0, 'src')
+import torch
+from models.tiny_gpt import create_tiny_gpt
+
+print(f'Python: {sys.version}')
+print(f'PyTorch: {torch.__version__}')
+print(f'CUDA available: {torch.cuda.is_available()}')
+
+# Test model creation
+model = create_tiny_gpt(vocab_size=100, d_model=32, n_layers=2, n_heads=4)
+print(f'Model creation works! Parameters: {model.count_parameters():,}')
+"
+
+# Run tests
+pytest tests -v --tb=short
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### Import Errors
+```bash
+# Problem: ModuleNotFoundError
+# Solution: Use proper Python path
+python -c "import sys; sys.path.insert(0, 'src'); from models.tiny_gpt import TinyGPT"
+
+# Or set PYTHONPATH
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+python -c "from models.tiny_gpt import TinyGPT"
+```
+
+#### Wandb Issues (Now Fixed!)
+```bash
+# Problem: wandb import errors in CI
+# Solution: Already fixed with conditional imports, but you can disable:
+export WANDB_MODE=disabled
+
+# Or install wandb if you want logging:
+pip install wandb
+```
+
+#### Device Issues (Now Fixed!)
+```bash
+# Problem: CUDA device mismatches
+# Solution: Already fixed! Model automatically handles device placement
+python -c "
+import sys; sys.path.insert(0, 'src')
+import torch
+from models.tiny_gpt import create_tiny_gpt
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = create_tiny_gpt(vocab_size=100, d_model=32, n_layers=2, n_heads=4).to(device)
+x = torch.randint(0, 100, (1, 10)).to(device)
+output, _ = model(x)
+print(f'Device handling works! Using: {device}')
+"
+```
+
+#### Test Failures
+```bash
+# Problem: Tests timing out or failing
+# Solution: Run with shorter timeout and verbose output
+pytest tests -v --tb=short --maxfail=5 --timeout=60
+
+# Run specific test categories
+pytest tests/test_models.py -v     # Just model tests
+pytest tests/test_data.py -v       # Just data tests
 ```
 
 ## Limitations and Risks
 
-### 9.1 Known Limitations
+### Known Limitations
 
 - **Small-scale regime**: Scaling slopes may differ from large-scale literature
 - **Tokenization sensitivity**: Tokenizer choice can dominate at this scale
 - **Overfitting risk**: Especially at long contexts with small corpora
 - **Hardware dependence**: Results may vary across different GPUs
 
-### 9.2 Ethical Considerations
+### Ethical Considerations
 
 - Respects all dataset licenses and usage terms
 - Avoids sensitive or personally identifiable data
@@ -246,13 +404,13 @@ If this repository helps your research, please cite:
   author = {Hussain, Raja},
   year = {2025},
   url = {https://github.com/Hussain0327/Ai-Research},
-  note = {Educational implementation with comprehensive scaling experiments}
+  note = {Educational implementation with comprehensive scaling experiments and robust CI/CD}
 }
 ```
 
 ## Roadmap
 
-### 11.1 Planned Features
+### Planned Features
 
 - [ ] **Advanced Techniques**
   - Distillation + 8/4-bit quantization Pareto curves
@@ -269,7 +427,7 @@ If this repository helps your research, please cite:
   - FLOPs-matched comparisons across architectures
   - Memory efficiency analysis
 
-### 11.2 Community Contributions
+### Community Contributions
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
 - Code style and testing requirements
@@ -280,8 +438,10 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
-3. Run tests: `make test`
+3. Run tests: `pytest tests -v`
 4. Submit a pull request
+
+All PRs are automatically tested across multiple Python versions!
 
 ## License
 
@@ -292,5 +452,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Inspired by the scaling laws literature from OpenAI, DeepMind, and Anthropic
 - Built with PyTorch, Transformers, and the open-source ML community
 - Special thanks to the TinyStories dataset creators
+- Recent improvements motivated by production-ready AI research practices
 
 ---
+
+**Star this repository if it helps your research or learning!**
+
+**Latest Update**: All CI/CD issues resolved - the project is now production-ready with comprehensive testing!

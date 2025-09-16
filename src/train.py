@@ -11,7 +11,6 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
-import wandb
 import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -97,15 +96,21 @@ class Trainer:
 
     def _init_wandb(self):
         """Initialize Weights & Biases logging."""
-        wandb.init(
-            project="tiny-lm-scaling",
-            config=self.config,
-            name=(
-                f"tinygpt_{self.config['model']['d_model']}d"
-                f"_{self.config['model']['n_layers']}l"
-            ),
-        )
-        wandb.watch(self.model, log="all", log_freq=1000)
+        try:
+            import wandb
+
+            wandb.init(
+                project="tiny-lm-scaling",
+                config=self.config,
+                name=(
+                    f"tinygpt_{self.config['model']['d_model']}d"
+                    f"_{self.config['model']['n_layers']}l"
+                ),
+            )
+            wandb.watch(self.model, log="all", log_freq=1000)
+        except ImportError:
+            print("Warning: wandb not available. Logging disabled.")
+            self.use_wandb = False
 
     def warmup_lr(self, step: int) -> float:
         """Compute learning rate with warmup."""
@@ -150,7 +155,6 @@ class Trainer:
         self.model.eval()
         total_loss = 0.0
         total_tokens = 0
-        perplexities = []
 
         for batch in tqdm(self.val_dataloader, desc="Evaluating", leave=False):
             input_ids = batch["input_ids"].to(self.device)
@@ -167,12 +171,8 @@ class Trainer:
             total_loss += loss.item() * valid_tokens
             total_tokens += valid_tokens
 
-            # Compute perplexity for this batch
-            batch_perplexity = torch.exp(loss).item()
-            perplexities.append(batch_perplexity)
-
         avg_loss = total_loss / total_tokens
-        avg_perplexity = np.mean(perplexities)
+        avg_perplexity = np.exp(avg_loss)
 
         return {"val_loss": avg_loss, "val_perplexity": avg_perplexity}
 
@@ -266,7 +266,12 @@ class Trainer:
                     }
 
                     if self.use_wandb:
-                        wandb.log(log_data)
+                        try:
+                            import wandb
+
+                            wandb.log(log_data)
+                        except ImportError:
+                            pass
 
                     print(
                         f"Step {self.step}: loss={avg_loss:.4f}, lr={lr:.2e}, "
@@ -286,7 +291,12 @@ class Trainer:
                     )
 
                     if self.use_wandb:
-                        wandb.log(eval_metrics)
+                        try:
+                            import wandb
+
+                            wandb.log(eval_metrics)
+                        except ImportError:
+                            pass
 
                     # Save best model
                     if eval_metrics["val_loss"] < self.best_val_loss:
@@ -406,7 +416,12 @@ def main():
     print(f"Training completed! Results saved to {results_path}")
 
     if not args.no_wandb:
-        wandb.finish()
+        try:
+            import wandb
+
+            wandb.finish()
+        except ImportError:
+            pass
 
 
 if __name__ == "__main__":

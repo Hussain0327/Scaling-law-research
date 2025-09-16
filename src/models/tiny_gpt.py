@@ -56,7 +56,9 @@ class MultiHeadAttention(nn.Module):
 
         # Create causal mask if needed
         if self.causal_mask is None or self.causal_mask.size(0) < seq_len:
-            mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+            mask = torch.triu(
+                torch.ones(seq_len, seq_len, device=x.device), diagonal=1
+            ).bool()
             self.register_buffer("causal_mask", mask)
 
         scores = scores.masked_fill(self.causal_mask[:seq_len, :seq_len], float("-inf"))
@@ -224,6 +226,7 @@ class TinyGPT(nn.Module):
         temperature: float = 1.0,
         top_k: Optional[int] = None,
         do_sample: bool = True,
+        eos_token: Optional[int] = None,
     ) -> torch.Tensor:
         """
         Generate text autoregressively.
@@ -234,6 +237,7 @@ class TinyGPT(nn.Module):
             temperature: Sampling temperature
             top_k: Top-k sampling parameter
             do_sample: Whether to sample or use greedy decoding
+            eos_token: End-of-sequence token id (stops generation if encountered)
 
         Returns:
             Generated token sequence
@@ -264,8 +268,8 @@ class TinyGPT(nn.Module):
 
                 generated = torch.cat([generated, next_token], dim=1)
 
-                # Stop if we hit EOS token (assuming vocab has it)
-                if next_token.item() == 0:  # Assuming 0 is EOS
+                # Stop if we hit EOS token
+                if eos_token is not None and next_token.item() == eos_token:
                     break
 
         return generated
