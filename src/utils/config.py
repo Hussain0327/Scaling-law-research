@@ -2,9 +2,10 @@
 Configuration utilities.
 """
 
-import yaml
 from pathlib import Path
 from typing import Any, Dict, Union
+
+import yaml
 
 
 def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
