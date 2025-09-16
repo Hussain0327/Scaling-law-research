@@ -47,7 +47,9 @@ def save_config(config: Dict[str, Any], config_path: Union[str, Path]) -> None:
         yaml.dump(config, f, default_flow_style=False, indent=2)
 
 
-def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
+def merge_configs(
+    base_config: Dict[str, Any], override_config: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Merge two configuration dictionaries, with override_config taking precedence.
 

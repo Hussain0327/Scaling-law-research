@@ -33,7 +33,7 @@ def setup_logging(
         format=format_str,
         handlers=[
             logging.StreamHandler(sys.stdout),
-        ]
+        ],
     )
 
     logger = logging.getLogger("tinygpt")

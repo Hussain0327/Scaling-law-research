@@ -226,7 +226,9 @@ class TestTinyGPT:
         # Attention: q,k,v (no bias) + out_proj (has bias)
         attn_params = 3 * d_model * d_model + d_model * d_model + d_model
         # MLP: fc1 (has bias) + fc2 (has bias)
-        mlp_params = d_model * (4 * d_model) + (4 * d_model) + (4 * d_model) * d_model + d_model
+        mlp_params = (
+            d_model * (4 * d_model) + (4 * d_model) + (4 * d_model) * d_model + d_model
+        )
         # Layer norms: 2 per layer, each has weight + bias
         ln_params = 2 * (d_model + d_model)
 
@@ -237,7 +239,9 @@ class TestTinyGPT:
 
         expected_params = embedding_params + layer_params + final_ln_params
 
-        assert param_count == expected_params, f"Expected {expected_params}, got {param_count}"
+        assert (
+            param_count == expected_params
+        ), f"Expected {expected_params}, got {param_count}"
 
     def test_generation_shape(self, model_config):
         """Test text generation output shape."""
