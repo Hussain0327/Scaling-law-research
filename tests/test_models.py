@@ -261,8 +261,8 @@ class TestTinyGPT:
 
     def test_gradient_check_tiny_operation(self, model_config):
         """Gradient check for a small operation (as required by blueprint)."""
-        # Test a simple linear layer instead of the complex transformer operations
-        # which involve dropout, layer norms, and other operations that make gradient checking difficult
+        # Use a simple linear layer instead of the full transformer operations.
+        # Dropout, layer norms, and similar pieces make gradient checks unreliable.
         d_model = model_config["d_model"]
         simple_layer = torch.nn.Linear(d_model, d_model)
 
