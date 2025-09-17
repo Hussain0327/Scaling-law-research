@@ -31,7 +31,8 @@ def _resolve_load_dataset() -> Callable[..., Any]:
     except ImportError as exc:  # pragma: no cover - exercised when dependency missing
         raise ImportError(
             "TinyStoriesDataModule requires the optional 'datasets' package. "
-            "Install it with `pip install datasets` to enable Hugging Face dataset support."
+            "Install it with `pip install datasets` to enable Hugging Face dataset "
+            "support."
         ) from exc
 
     _DATASET_LOADER = hf_load_dataset
