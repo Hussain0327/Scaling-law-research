@@ -18,7 +18,7 @@ def _resolve_gpt2_tokenizer_fast():
     except ImportError as exc:  # pragma: no cover - exercised when dependency missing
         raise ImportError(
             "SubwordTokenizer requires the optional 'transformers' package. "
-            "Install it with `pip install transformers` to enable Hugging Face tokenizers."
+            "Install it with `pip install transformers` to use Hugging Face tokenizers."
         ) from exc
 
     return GPT2TokenizerFast
