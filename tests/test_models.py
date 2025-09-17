@@ -4,6 +4,7 @@ Includes gradient checks and architectural validation.
 """
 
 import sys
+import types
 
 sys.path.append("src")
 
@@ -380,6 +381,35 @@ class TestTinyGPT:
         assert torch.equal(
             generated1, generated2
         ), "Deterministic generation should be reproducible"
+
+    def test_generation_respects_eos_token(self, model_config):
+        """Ensure generation stops early when EOS token is produced."""
+        model = TinyGPT(**model_config)
+        eos_token_id = 3
+
+        def fake_forward(self, input_ids, targets=None):
+            batch, seq_len = input_ids.shape
+            logits = torch.full(
+                (batch, seq_len, self.vocab_size),
+                fill_value=-float("inf"),
+                device=input_ids.device,
+            )
+            logits[:, -1, eos_token_id] = 0.0
+            return logits, None
+
+        model.forward = types.MethodType(fake_forward, model)
+        input_ids = torch.tensor([[1, 2]], dtype=torch.long)
+
+        generated = model.generate(
+            input_ids,
+            max_new_tokens=5,
+            do_sample=False,
+            eos_token_id=eos_token_id,
+        )
+
+        # Expect exactly one new token since EOS is generated immediately
+        assert generated.shape[1] == input_ids.shape[1] + 1
+        assert generated[0, -1].item() == eos_token_id
 
 
 class TestModelConstraints:

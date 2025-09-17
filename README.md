@@ -51,7 +51,7 @@ logits, _ = model(x)
 print(f'Model works! Output shape: {logits.shape}')
 
 # Test generation with custom EOS token
-generated = model.generate(x, max_new_tokens=5, eos_token=99)
+generated = model.generate(x, max_new_tokens=5, eos_token_id=99)
 print(f'Generation works! Generated: {generated.shape}')
 "
 ```
@@ -159,7 +159,7 @@ logits, loss = model(input_ids, input_ids)  # Self-supervised
 print(f'Forward pass successful! Loss: {loss:.4f}')
 
 # Test generation
-generated = model.generate(input_ids[:1], max_new_tokens=10, eos_token=999)
+generated = model.generate(input_ids[:1], max_new_tokens=10, eos_token_id=999)
 print(f'Generation successful! Shape: {generated.shape}')
 "
 ```

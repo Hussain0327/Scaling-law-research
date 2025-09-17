@@ -29,7 +29,7 @@ class MultiHeadAttention(nn.Module):
         self.out_proj = nn.Linear(d_model, d_model)
 
         self.dropout = nn.Dropout(dropout)
-        self.register_buffer("causal_mask", None)
+        self.register_buffer("causal_mask", torch.zeros(0, 0, dtype=torch.bool))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, seq_len, d_model = x.shape
@@ -55,11 +55,12 @@ class MultiHeadAttention(nn.Module):
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)
 
         # Create causal mask if needed
-        if self.causal_mask is None or self.causal_mask.size(0) < seq_len:
+        if self.causal_mask.device != x.device or self.causal_mask.size(0) < seq_len:
             mask = torch.triu(
-                torch.ones(seq_len, seq_len, device=x.device), diagonal=1
-            ).bool()
-            self.register_buffer("causal_mask", mask)
+                torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool),
+                diagonal=1,
+            )
+            self.causal_mask = mask
 
         scores = scores.masked_fill(self.causal_mask[:seq_len, :seq_len], float("-inf"))
         attn_weights = F.softmax(scores, dim=-1)
@@ -226,7 +227,7 @@ class TinyGPT(nn.Module):
         temperature: float = 1.0,
         top_k: Optional[int] = None,
         do_sample: bool = True,
-        eos_token: Optional[int] = None,
+        eos_token_id: Optional[int] = None,
     ) -> torch.Tensor:
         """
         Generate text autoregressively.
@@ -237,7 +238,7 @@ class TinyGPT(nn.Module):
             temperature: Sampling temperature
             top_k: Top-k sampling parameter
             do_sample: Whether to sample or use greedy decoding
-            eos_token: End-of-sequence token id (stops generation if encountered)
+            eos_token_id: End-of-sequence token id (stops generation if encountered)
 
         Returns:
             Generated token sequence
@@ -269,7 +270,7 @@ class TinyGPT(nn.Module):
                 generated = torch.cat([generated, next_token], dim=1)
 
                 # Stop if we hit EOS token
-                if eos_token is not None and next_token.item() == eos_token:
+                if eos_token_id is not None and next_token.item() == eos_token_id:
                     break
 
         return generated

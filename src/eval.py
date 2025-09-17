@@ -384,6 +384,8 @@ class ModelEvaluator:
 
         samples = []
 
+        eos_token_id = getattr(tokenizer, "eos_token_id", None)
+
         for prompt in prompts:
             prompt_samples = []
 
@@ -401,6 +403,7 @@ class ModelEvaluator:
                         max_new_tokens=max_new_tokens,
                         temperature=temperature,
                         do_sample=True,
+                        eos_token_id=eos_token_id,
                     )
 
                 # Decode
