@@ -15,7 +15,6 @@ from .tokenizers import (
     create_tokenizer,
 )
 
-
 _DATASET_LOADER: Optional[Callable[..., Any]] = None
 
 
@@ -48,12 +47,14 @@ def load_dataset(*args: Any, **kwargs: Any) -> Any:
 class TextDataset(Dataset):
     """Generic text dataset for language modeling."""
 
+    def __init__(
+        self,
         texts: List[str],
         tokenizer: Union[CharacterTokenizer, SubwordTokenizer],
         max_length: int = 256,
         stride: int = 128,
         add_special_tokens: bool = True,
-    ):
+    ) -> None:
         self.texts = texts
         self.tokenizer = tokenizer
         self.max_length = max_length
