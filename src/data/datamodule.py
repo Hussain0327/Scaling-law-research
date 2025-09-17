@@ -4,9 +4,8 @@ Supports TinyStories and other text datasets.
 """
 
 import random
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
-from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
 
 from .tokenizers import (
@@ -15,6 +14,35 @@ from .tokenizers import (
     collate_fn,
     create_tokenizer,
 )
+
+
+_DATASET_LOADER: Optional[Callable[..., Any]] = None
+
+
+def _resolve_load_dataset() -> Callable[..., Any]:
+    """Dynamically import ``datasets.load_dataset`` when needed."""
+
+    global _DATASET_LOADER
+
+    if _DATASET_LOADER is not None:
+        return _DATASET_LOADER
+
+    try:
+        from datasets import load_dataset as hf_load_dataset
+    except ImportError as exc:  # pragma: no cover - exercised when dependency missing
+        raise ImportError(
+            "TinyStoriesDataModule requires the optional 'datasets' package. "
+            "Install it with `pip install datasets` to enable Hugging Face dataset support."
+        ) from exc
+
+    _DATASET_LOADER = hf_load_dataset
+    return _DATASET_LOADER
+
+
+def load_dataset(*args: Any, **kwargs: Any) -> Any:
+    """Proxy to ``datasets.load_dataset`` with a helpful error if it's unavailable."""
+
+    return _resolve_load_dataset()(*args, **kwargs)
 
 
 class TextDataset(Dataset):
@@ -359,6 +387,15 @@ def get_dataset_stats(dataloader: DataLoader) -> Dict[str, Any]:
         total_samples += batch_size
         total_tokens += batch_size * seq_len
         seq_lengths.extend([seq_len] * batch_size)
+
+    if total_samples == 0:
+        return {
+            "total_samples": 0,
+            "total_tokens": 0,
+            "avg_tokens_per_sample": 0.0,
+            "max_seq_length": 0,
+            "min_seq_length": 0,
+        }
 
     return {
         "total_samples": total_samples,

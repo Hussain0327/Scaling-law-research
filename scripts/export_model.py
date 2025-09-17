@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from models.tiny_gpt import TinyGPT
 from data.tokenizers import CharacterTokenizer, SubwordTokenizer
@@ -45,12 +45,12 @@ def find_best_checkpoint(checkpoint_dir: str) -> Optional[str]:
         return None
 
     best_checkpoint = None
-    best_loss = float('inf')
+    best_loss = float("inf")
 
     for checkpoint_file in checkpoint_files:
         try:
-            checkpoint = torch.load(checkpoint_file, map_location='cpu')
-            val_loss = checkpoint.get('best_val_loss', float('inf'))
+            checkpoint = torch.load(checkpoint_file, map_location="cpu")
+            val_loss = checkpoint.get("best_val_loss", float("inf"))
 
             if val_loss < best_loss:
                 best_loss = val_loss
@@ -67,7 +67,7 @@ def export_model(
     output_dir: str,
     export_format: str = "pytorch",
     include_tokenizer: bool = True,
-    optimize_for_inference: bool = True
+    optimize_for_inference: bool = True,
 ) -> Dict[str, Any]:
     """
     Export a trained model for inference.
@@ -88,42 +88,45 @@ def export_model(
     print(f"Loading checkpoint from: {checkpoint_path}")
 
     # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-    config = checkpoint['config']
-    model_config = config['model']
+    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    config = checkpoint["config"]
+    model_config = config["model"]
 
     # Create and load model
     model = TinyGPT(**model_config)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint["model_state_dict"])
 
     if optimize_for_inference:
         model.eval()
         # Disable dropout for inference
         for module in model.modules():
-            if hasattr(module, 'dropout'):
+            if hasattr(module, "dropout"):
                 module.dropout.p = 0.0
 
     print(f"Loaded model with {model.count_parameters():,} parameters")
 
     export_info = {
-        'model_config': model_config,
-        'training_config': config.get('training', {}),
-        'model_parameters': model.count_parameters(),
-        'final_val_loss': checkpoint.get('best_val_loss'),
-        'total_steps': checkpoint.get('step'),
-        'export_format': export_format,
-        'optimized_for_inference': optimize_for_inference
+        "model_config": model_config,
+        "training_config": config.get("training", {}),
+        "model_parameters": model.count_parameters(),
+        "final_val_loss": checkpoint.get("best_val_loss"),
+        "total_steps": checkpoint.get("step"),
+        "export_format": export_format,
+        "optimized_for_inference": optimize_for_inference,
     }
 
     # Export model in specified format
     if export_format == "pytorch":
         # Save as standard PyTorch model
         model_path = output_path / "model.pt"
-        torch.save({
-            'model_state_dict': model.state_dict(),
-            'model_config': model_config,
-            'export_info': export_info
-        }, model_path)
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "model_config": model_config,
+                "export_info": export_info,
+            },
+            model_path,
+        )
 
         print(f"PyTorch model saved to: {model_path}")
 
@@ -132,7 +135,7 @@ def export_model(
         model.eval()
 
         # Create example input
-        example_input = torch.randint(0, model_config['vocab_size'], (1, 10))
+        example_input = torch.randint(0, model_config["vocab_size"], (1, 10))
 
         try:
             # Try tracing first
@@ -157,7 +160,7 @@ def export_model(
             import torch.onnx
 
             model.eval()
-            example_input = torch.randint(0, model_config['vocab_size'], (1, 10))
+            example_input = torch.randint(0, model_config["vocab_size"], (1, 10))
 
             onnx_path = output_path / "model.onnx"
             torch.onnx.export(
@@ -167,12 +170,12 @@ def export_model(
                 export_params=True,
                 opset_version=11,
                 do_constant_folding=True,
-                input_names=['input_ids'],
-                output_names=['logits'],
+                input_names=["input_ids"],
+                output_names=["logits"],
                 dynamic_axes={
-                    'input_ids': {0: 'batch_size', 1: 'sequence_length'},
-                    'logits': {0: 'batch_size', 1: 'sequence_length'}
-                }
+                    "input_ids": {0: "batch_size", 1: "sequence_length"},
+                    "logits": {0: "batch_size", 1: "sequence_length"},
+                },
             )
             print(f"ONNX model saved to: {onnx_path}")
 
@@ -183,37 +186,39 @@ def export_model(
 
     # Save model configuration and metadata
     config_path = output_path / "model_config.json"
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         json.dump(export_info, f, indent=2)
 
     # Export tokenizer if requested
     if include_tokenizer:
         try:
             # Try to recreate tokenizer from config
-            data_config = config.get('data', {})
-            tokenizer_type = data_config.get('tokenizer_type', 'char')
+            data_config = config.get("data", {})
+            tokenizer_type = data_config.get("tokenizer_type", "char")
 
-            if tokenizer_type == 'char':
+            if tokenizer_type == "char":
                 # For character tokenizer, we need the vocabulary
                 # This is a limitation - we'd need to save the tokenizer during training
-                print("Warning: Character tokenizer vocabulary not available in checkpoint.")
+                print(
+                    "Warning: Character tokenizer vocabulary not available in checkpoint."
+                )
                 print("Consider saving tokenizer during training for complete export.")
 
-            elif tokenizer_type == 'subword':
-                tokenizer = SubwordTokenizer(data_config.get('model_name', 'gpt2'))
+            elif tokenizer_type == "subword":
+                tokenizer = SubwordTokenizer(data_config.get("model_name", "gpt2"))
 
                 # Save tokenizer info
                 tokenizer_info = {
-                    'type': 'subword',
-                    'model_name': data_config.get('model_name', 'gpt2'),
-                    'vocab_size': tokenizer.vocab_size,
-                    'pad_token_id': tokenizer.pad_token_id,
-                    'eos_token_id': tokenizer.eos_token_id,
-                    'bos_token_id': tokenizer.bos_token_id
+                    "type": "subword",
+                    "model_name": data_config.get("model_name", "gpt2"),
+                    "vocab_size": tokenizer.vocab_size,
+                    "pad_token_id": tokenizer.pad_token_id,
+                    "eos_token_id": tokenizer.eos_token_id,
+                    "bos_token_id": tokenizer.bos_token_id,
                 }
 
                 tokenizer_path = output_path / "tokenizer_info.json"
-                with open(tokenizer_path, 'w') as f:
+                with open(tokenizer_path, "w") as f:
                     json.dump(tokenizer_info, f, indent=2)
 
                 print(f"Tokenizer info saved to: {tokenizer_path}")
@@ -280,14 +285,14 @@ if __name__ == "__main__":
 '''
 
     script_path = output_path / "inference.py"
-    with open(script_path, 'w') as f:
+    with open(script_path, "w") as f:
         f.write(inference_script)
 
     print(f"Inference script saved to: {script_path}")
 
     # Save export summary
     summary_path = output_path / "export_summary.json"
-    with open(summary_path, 'w') as f:
+    with open(summary_path, "w") as f:
         json.dump(export_info, f, indent=2)
 
     print(f"Export completed! Summary saved to: {summary_path}")
@@ -297,18 +302,37 @@ if __name__ == "__main__":
 
 def main():
     parser = argparse.ArgumentParser(description="Export trained TinyGPT model")
-    parser.add_argument("--checkpoint_dir", type=str, required=True,
-                       help="Directory containing model checkpoint")
-    parser.add_argument("--output_dir", type=str, required=True,
-                       help="Output directory for exported model")
-    parser.add_argument("--checkpoint_file", type=str, default=None,
-                       help="Specific checkpoint file (if not provided, best will be found)")
-    parser.add_argument("--format", type=str, choices=["pytorch", "torchscript", "onnx"],
-                       default="pytorch", help="Export format")
-    parser.add_argument("--include_tokenizer", action="store_true",
-                       help="Include tokenizer information")
-    parser.add_argument("--optimize", action="store_true",
-                       help="Optimize model for inference")
+    parser.add_argument(
+        "--checkpoint_dir",
+        type=str,
+        required=True,
+        help="Directory containing model checkpoint",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Output directory for exported model",
+    )
+    parser.add_argument(
+        "--checkpoint_file",
+        type=str,
+        default=None,
+        help="Specific checkpoint file (if not provided, best will be found)",
+    )
+    parser.add_argument(
+        "--format",
+        type=str,
+        choices=["pytorch", "torchscript", "onnx"],
+        default="pytorch",
+        help="Export format",
+    )
+    parser.add_argument(
+        "--include_tokenizer", action="store_true", help="Include tokenizer information"
+    )
+    parser.add_argument(
+        "--optimize", action="store_true", help="Optimize model for inference"
+    )
 
     args = parser.parse_args()
 
@@ -330,7 +354,7 @@ def main():
         output_dir=args.output_dir,
         export_format=args.format,
         include_tokenizer=args.include_tokenizer,
-        optimize_for_inference=args.optimize
+        optimize_for_inference=args.optimize,
     )
 
     print("\nExport completed successfully!")

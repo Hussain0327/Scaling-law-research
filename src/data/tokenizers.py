@@ -8,7 +8,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import torch
-from transformers import GPT2TokenizerFast
+
+
+def _resolve_gpt2_tokenizer_fast():
+    """Import :class:`transformers.GPT2TokenizerFast` only when required."""
+
+    try:
+        from transformers import GPT2TokenizerFast  # type: ignore import
+    except ImportError as exc:  # pragma: no cover - exercised when dependency missing
+        raise ImportError(
+            "SubwordTokenizer requires the optional 'transformers' package. "
+            "Install it with `pip install transformers` to enable Hugging Face tokenizers."
+        ) from exc
+
+    return GPT2TokenizerFast
 
 
 class CharacterTokenizer:
@@ -145,7 +158,8 @@ class SubwordTokenizer:
     """Wrapper around HuggingFace tokenizer for subword tokenization."""
 
     def __init__(self, model_name: str = "gpt2"):
-        self.tokenizer = GPT2TokenizerFast.from_pretrained(model_name)
+        tokenizer_cls = _resolve_gpt2_tokenizer_fast()
+        self.tokenizer = tokenizer_cls.from_pretrained(model_name)
 
         # Add pad token if not present
         if self.tokenizer.pad_token is None:
