@@ -48,8 +48,6 @@ def load_dataset(*args: Any, **kwargs: Any) -> Any:
 class TextDataset(Dataset):
     """Generic text dataset for language modeling."""
 
-    def __init__(
-        self,
         texts: List[str],
         tokenizer: Union[CharacterTokenizer, SubwordTokenizer],
         max_length: int = 256,
