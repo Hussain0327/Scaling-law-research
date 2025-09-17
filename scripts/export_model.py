@@ -113,7 +113,6 @@ def export_model(
         "total_steps": checkpoint.get("step"),
         "export_format": export_format,
         "optimized_for_inference": optimize_for_inference,
-        "tokenizer_info": None,
     }
 
     # Export model in specified format
