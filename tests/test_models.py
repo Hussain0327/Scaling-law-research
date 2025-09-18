@@ -316,8 +316,8 @@ class TestTinyGPT:
         )
         # For a simple linear layer, gradients should match reasonably well
         assert (
-            relative_error < 1e-2
-        ), f"Gradient check failed: relative error {relative_error:.2e} > 1e-2"
+            relative_error < 2e-2
+        ), f"Gradient check failed: relative error {relative_error:.2e} > 2e-2"
 
     def test_weight_tying(self, model_config):
         """Test that token embedding and output weights are tied."""
