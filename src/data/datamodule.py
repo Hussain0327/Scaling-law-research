@@ -143,7 +143,8 @@ class TinyStoriesDataModule:
         # Limit number of samples if specified
         if self.max_samples:
             train_samples = min(self.max_samples, len(dataset["train"]))
-            val_samples = min(self.max_samples // 10, len(dataset["validation"]))
+            val_requested = max(1, self.max_samples // 10) if self.max_samples > 0 else 0
+            val_samples = min(val_requested, len(dataset["validation"]))
 
             dataset["train"] = dataset["train"].select(range(train_samples))
             dataset["validation"] = dataset["validation"].select(range(val_samples))

@@ -208,12 +208,9 @@ class TinyGPT(nn.Module):
 
         loss = None
         if targets is not None:
-            # Shift targets for next-token prediction
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = targets[..., 1:].contiguous()
             loss = F.cross_entropy(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1),
+                logits.view(-1, logits.size(-1)),
+                targets.view(-1),
                 ignore_index=-100,
             )
 
@@ -244,6 +241,9 @@ class TinyGPT(nn.Module):
         """
         self.eval()
         generated = input_ids.clone()
+        finished = torch.zeros(
+            generated.size(0), dtype=torch.bool, device=generated.device
+        )
 
         with torch.no_grad():
             for _ in range(max_new_tokens):
@@ -259,6 +259,11 @@ class TinyGPT(nn.Module):
                     v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                     logits[logits < v[:, [-1]]] = -float("inf")
 
+                if eos_token is not None and finished.any():
+                    logits = logits.clone()
+                    logits[finished] = -float("inf")
+                    logits[finished, eos_token] = 0
+
                 # Sample next token
                 if do_sample:
                     probs = F.softmax(logits, dim=-1)
@@ -269,8 +274,11 @@ class TinyGPT(nn.Module):
                 generated = torch.cat([generated, next_token], dim=1)
 
                 # Stop if we hit EOS token
-                if eos_token is not None and next_token.item() == eos_token:
-                    break
+                if eos_token is not None:
+                    newly_finished = next_token.squeeze(-1).eq(eos_token)
+                    finished = finished | newly_finished
+                    if torch.all(finished):
+                        break
 
         return generated
 
