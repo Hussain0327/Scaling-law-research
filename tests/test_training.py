@@ -598,9 +598,7 @@ class TestTrainingIntegration:
         loss2 = trainer2.train_step(create_fixed_batch(2))
 
         # Losses should be similar within a reasonable tolerance
-        assert abs(loss1 - loss2) < 0.5, (
-            f"Losses too different: {loss1} vs {loss2}"
-        )
+        assert abs(loss1 - loss2) < 0.5, f"Losses too different: {loss1} vs {loss2}"
 
 
 if __name__ == "__main__":
