@@ -13,9 +13,9 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import torch
 import yaml
+from torch.optim import SGD, Adam, AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from torch.optim import Adam, AdamW, SGD
 
 from data import datamodule as data_datamodule
 from models.tiny_gpt import TinyGPT

@@ -1,15 +1,16 @@
 """Script to analyze scaling law experiments and generate comprehensive plots."""
 
-import json
 import argparse
+import json
+import warnings
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.optimize import curve_fit
-import warnings
 
 warnings.filterwarnings("ignore")
 

@@ -1,11 +1,12 @@
 """Script to run parameter sweeps for scaling law experiments."""
 
-import sys
-import json
 import argparse
+import json
+import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 import yaml
 
 # Add src to path
@@ -141,7 +142,7 @@ def run_single_experiment(
 
     try:
         # Run training
-        from train import setup_experiment, Trainer
+        from train import Trainer, setup_experiment
 
         # Setup experiment
         model, train_loader, val_loader = setup_experiment(config)

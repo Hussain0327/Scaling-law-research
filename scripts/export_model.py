@@ -1,18 +1,19 @@
 """Script to export trained models for inference and deployment."""
 
-import sys
-import json
 import argparse
-import torch
+import json
+import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+import torch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from models.tiny_gpt import TinyGPT
-from data.tokenizers import SubwordTokenizer
 from data import datamodule as data_datamodule
+from data.tokenizers import SubwordTokenizer
+from models.tiny_gpt import TinyGPT
 
 
 def find_best_checkpoint(checkpoint_dir: str) -> Optional[str]:

@@ -4,9 +4,9 @@ Unit tests for training functionality.
 
 import sys
 import tempfile
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from copy import deepcopy
 
 sys.path.append("src")
 
