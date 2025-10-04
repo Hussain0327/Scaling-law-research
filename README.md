@@ -3,7 +3,8 @@
 [![CI/CD Pipeline](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)
-[![Run in Colab](https://colab.research.google.com/assets/colab-badge.svg)](#60-second-quickstart)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1Rd-rJdPS4pPpumSFQxwjgR07r7BfgRbW?usp=sharing)
+
 
 TinyGPT is a reproducible research sandbox for measuring how lightweight GPT-style
 language models respond to changes in model scale, data budget, and optimization
