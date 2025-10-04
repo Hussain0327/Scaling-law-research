@@ -127,18 +127,10 @@ class TestCharacterTokenizer:
         texts = ["hello"]
         tokenizer.build_vocab(texts)
 
-        assert tokenizer.pad_token_id == tokenizer.char_to_idx[
-            tokenizer.pad_token
-        ]
-        assert tokenizer.unk_token_id == tokenizer.char_to_idx[
-            tokenizer.unk_token
-        ]
-        assert tokenizer.eos_token_id == tokenizer.char_to_idx[
-            tokenizer.eos_token
-        ]
-        assert tokenizer.bos_token_id == tokenizer.char_to_idx[
-            tokenizer.bos_token
-        ]
+        assert tokenizer.pad_token_id == tokenizer.char_to_idx[tokenizer.pad_token]
+        assert tokenizer.unk_token_id == tokenizer.char_to_idx[tokenizer.unk_token]
+        assert tokenizer.eos_token_id == tokenizer.char_to_idx[tokenizer.eos_token]
+        assert tokenizer.bos_token_id == tokenizer.char_to_idx[tokenizer.bos_token]
 
 
 class TestSubwordTokenizer:
