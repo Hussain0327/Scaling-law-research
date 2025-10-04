@@ -5,6 +5,7 @@ Supports various model sizes and configurations for research.
 
 import argparse
 import json
+import math
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -14,6 +15,7 @@ import torch
 import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from torch.optim import Adam, AdamW, SGD
 
 from data import datamodule as data_datamodule
 from models.tiny_gpt import TinyGPT
@@ -44,7 +46,7 @@ class Trainer:
         self.val_dataloader = val_dataloader
         self.config = config
         self.save_dir = Path(save_dir)
-        self.save_dir.mkdir(exist_ok=True)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
         self.use_wandb = use_wandb
 
         # Training configuration
@@ -56,6 +58,7 @@ class Trainer:
         self.eval_interval = config["training"].get("eval_interval", 500)
         self.save_interval = config["training"].get("save_interval", 1000)
         self.log_interval = config["training"].get("log_interval", 100)
+        self.grad_accum_steps = max(1, config["training"].get("grad_accum_steps", 1))
 
         # Device setup
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -63,15 +66,11 @@ class Trainer:
         print(f"Using device: {self.device}")
 
         # Optimizer setup
-        self.optimizer = torch.optim.AdamW(
-            self.model.parameters(),
-            lr=self.learning_rate,
-            weight_decay=self.weight_decay,
-            betas=(0.9, 0.95),
-        )
+        self.optimizer = self._build_optimizer()
 
         # Learning rate scheduler
-        total_steps = len(train_dataloader) * self.num_epochs
+        steps_per_epoch = max(1, math.ceil(len(train_dataloader) / self.grad_accum_steps))
+        total_steps = steps_per_epoch * self.num_epochs
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=total_steps, eta_min=self.learning_rate * 0.1
         )
@@ -93,6 +92,31 @@ class Trainer:
         # Initialize wandb
         if self.use_wandb:
             self._init_wandb()
+
+    def _build_optimizer(self) -> torch.optim.Optimizer:
+        """Instantiate optimizer based on configuration."""
+
+        training_cfg = self.config.get("training", {})
+        optimizer_name = training_cfg.get("optimizer", "adamw").lower()
+        optimizer_kwargs = dict(training_cfg.get("optimizer_kwargs", {}) or {})
+
+        if optimizer_name == "adamw":
+            optimizer_cls = AdamW
+            optimizer_kwargs.setdefault("betas", (0.9, 0.95))
+        elif optimizer_name == "adam":
+            optimizer_cls = Adam
+            optimizer_kwargs.setdefault("betas", (0.9, 0.999))
+        elif optimizer_name == "sgd":
+            optimizer_cls = SGD
+            optimizer_kwargs.setdefault("momentum", 0.9)
+            optimizer_kwargs.setdefault("nesterov", True)
+        else:
+            raise ValueError(f"Unknown optimizer '{optimizer_name}'")
+
+        optimizer_kwargs.setdefault("lr", self.learning_rate)
+        optimizer_kwargs.setdefault("weight_decay", self.weight_decay)
+
+        return optimizer_cls(self.model.parameters(), **optimizer_kwargs)
 
     def _init_wandb(self):
         """Initialize Weights & Biases logging."""
@@ -119,35 +143,47 @@ class Trainer:
         return self.learning_rate
 
     def train_step(self, batch: Dict[str, torch.Tensor]) -> float:
-        """Single training step."""
+        """Forward/backward pass with optional mixed precision."""
         input_ids = batch["input_ids"].to(self.device)
         labels = batch["labels"].to(self.device)
 
         self.model.train()
-        self.optimizer.zero_grad()
 
         if self.use_amp:
             with torch.cuda.amp.autocast():
                 logits, loss = self.model(input_ids, labels)
-            self.scaler.scale(loss).backward()
+            scaled_loss = loss / self.grad_accum_steps
+            self.scaler.scale(scaled_loss).backward()
+        else:
+            logits, loss = self.model(input_ids, labels)
+            scaled_loss = loss / self.grad_accum_steps
+            scaled_loss.backward()
+
+        return loss.item()
+
+    def _optimizer_step(self) -> None:
+        """Apply gradients, perform clipping, and update optimizer state."""
+
+        if self.use_amp:
             self.scaler.unscale_(self.optimizer)
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
             self.scaler.step(self.optimizer)
             self.scaler.update()
         else:
-            logits, loss = self.model(input_ids, labels)
-            loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
             self.optimizer.step()
 
-        # Update learning rate with warmup
-        if self.step < self.warmup_steps:
+        self.optimizer.zero_grad(set_to_none=True)
+
+    def _update_scheduler(self) -> None:
+        """Handle learning rate warmup and scheduler stepping."""
+
+        if self.warmup_steps > 0 and self.step <= self.warmup_steps:
+            lr = self.warmup_lr(self.step)
             for param_group in self.optimizer.param_groups:
-                param_group["lr"] = self.warmup_lr(self.step)
+                param_group["lr"] = lr
         else:
             self.scheduler.step()
-
-        return loss.item()
 
     @torch.no_grad()
     def evaluate(self) -> Dict[str, float]:
@@ -234,81 +270,111 @@ class Trainer:
 
         start_time = time.time()
         running_loss = 0.0
+        tokens_since_log = 0
+        updates_since_log = 0
 
         for epoch in range(self.num_epochs):
             self.epoch = epoch
             print(f"\nEpoch {epoch + 1}/{self.num_epochs}")
+
+            self.optimizer.zero_grad(set_to_none=True)
+            accumulation_counter = 0
+            current_step_loss = 0.0
+            step_tokens = 0
+            num_batches = len(self.train_dataloader)
 
             # Training loop
             for batch_idx, batch in enumerate(
                 tqdm(self.train_dataloader, desc="Training")
             ):
                 loss = self.train_step(batch)
-                running_loss += loss
-                self.step += 1
+                accumulation_counter += 1
+                current_step_loss += loss
+                step_tokens += batch["input_ids"].numel()
 
-                # Logging
-                if self.step % self.log_interval == 0:
-                    avg_loss = running_loss / self.log_interval
-                    self.train_losses.append(avg_loss)
+                should_step = False
+                batches_in_step = self.grad_accum_steps
 
-                    lr = self.optimizer.param_groups[0]["lr"]
-                    tokens_per_sec = (
-                        (self.log_interval * batch["input_ids"].numel())
-                        / (time.time() - start_time)
-                        if self.step > self.log_interval
-                        else 0
-                    )
+                if accumulation_counter >= self.grad_accum_steps:
+                    should_step = True
+                    batches_in_step = self.grad_accum_steps
+                elif batch_idx + 1 == num_batches:
+                    should_step = accumulation_counter > 0
+                    batches_in_step = accumulation_counter if accumulation_counter > 0 else self.grad_accum_steps
 
-                    log_data = {
-                        "train_loss": avg_loss,
-                        "learning_rate": lr,
-                        "tokens_per_sec": tokens_per_sec,
-                        "step": self.step,
-                        "epoch": epoch,
-                    }
+                if should_step:
+                    self._optimizer_step()
+                    self.step += 1
+                    self._update_scheduler()
 
-                    if self.use_wandb:
-                        try:
-                            import wandb
+                    step_loss = current_step_loss / batches_in_step
+                    running_loss += step_loss
+                    current_step_loss = 0.0
+                    tokens_since_log += step_tokens
+                    step_tokens = 0
+                    updates_since_log += 1
+                    accumulation_counter = 0
 
-                            wandb.log(log_data)
-                        except ImportError:
-                            pass
+                    # Logging
+                    if self.step % self.log_interval == 0:
+                        avg_loss = running_loss / max(1, updates_since_log)
+                        self.train_losses.append(avg_loss)
 
-                    print(
-                        f"Step {self.step}: loss={avg_loss:.4f}, lr={lr:.2e}, "
-                        f"tokens/s={tokens_per_sec:.1f}"
-                    )
-                    running_loss = 0.0
-                    start_time = time.time()
+                        lr = self.optimizer.param_groups[0]["lr"]
+                        elapsed = max(1e-8, time.time() - start_time)
+                        tokens_per_sec = tokens_since_log / elapsed
 
-                # Evaluation
-                if self.step % self.eval_interval == 0:
-                    eval_metrics = self.evaluate()
-                    self.val_losses.append(eval_metrics["val_loss"])
+                        log_data = {
+                            "train_loss": avg_loss,
+                            "learning_rate": lr,
+                            "tokens_per_sec": tokens_per_sec,
+                            "step": self.step,
+                            "epoch": epoch,
+                        }
 
-                    print(
-                        f"Validation - Loss: {eval_metrics['val_loss']:.4f}, "
-                        f"Perplexity: {eval_metrics['val_perplexity']:.2f}"
-                    )
+                        if self.use_wandb:
+                            try:
+                                import wandb
 
-                    if self.use_wandb:
-                        try:
-                            import wandb
+                                wandb.log(log_data)
+                            except ImportError:
+                                pass
 
-                            wandb.log(eval_metrics)
-                        except ImportError:
-                            pass
+                        print(
+                            f"Step {self.step}: loss={avg_loss:.4f}, lr={lr:.2e}, "
+                            f"tokens/s={tokens_per_sec:.1f}"
+                        )
+                        running_loss = 0.0
+                        tokens_since_log = 0
+                        updates_since_log = 0
+                        start_time = time.time()
 
-                    # Save best model
-                    if eval_metrics["val_loss"] < self.best_val_loss:
-                        self.best_val_loss = eval_metrics["val_loss"]
-                        self.save_checkpoint(is_best=True)
+                    # Evaluation
+                    if self.step % self.eval_interval == 0:
+                        eval_metrics = self.evaluate()
+                        self.val_losses.append(eval_metrics["val_loss"])
 
-                # Save checkpoint
-                if self.step % self.save_interval == 0:
-                    self.save_checkpoint()
+                        print(
+                            f"Validation - Loss: {eval_metrics['val_loss']:.4f}, "
+                            f"Perplexity: {eval_metrics['val_perplexity']:.2f}"
+                        )
+
+                        if self.use_wandb:
+                            try:
+                                import wandb
+
+                                wandb.log(eval_metrics)
+                            except ImportError:
+                                pass
+
+                        # Save best model
+                        if eval_metrics["val_loss"] < self.best_val_loss:
+                            self.best_val_loss = eval_metrics["val_loss"]
+                            self.save_checkpoint(is_best=True)
+
+                    # Save checkpoint periodically
+                    if self.step % self.save_interval == 0:
+                        self.save_checkpoint()
 
         # Final evaluation
         final_metrics = self.evaluate()

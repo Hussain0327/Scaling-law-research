@@ -6,6 +6,7 @@ import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from copy import deepcopy
 
 sys.path.append("src")
 
@@ -137,12 +138,67 @@ class TestTrainer:
         assert isinstance(loss, float)
         assert loss > 0
 
-        # Check that parameters were updated
+        # Ensure gradients are populated but parameters remain unchanged until optimizer step
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                assert param.grad is not None
+                assert torch.equal(param, initial_params[name])
+
+        trainer._optimizer_step()
+
         for name, param in model.named_parameters():
             if param.requires_grad:
                 assert not torch.equal(
                     param, initial_params[name]
                 ), f"Parameter {name} was not updated"
+
+    def test_grad_accumulation_respects_step_frequency(
+        self, minimal_config, mock_dataloaders
+    ):
+        """Gradient accumulation delays optimizer steps until the configured threshold."""
+        config = deepcopy(minimal_config)
+        config["training"]["grad_accum_steps"] = 2
+
+        model = TinyGPT(**config["model"])
+        train_loader, val_loader = mock_dataloaders
+
+        trainer = Trainer(
+            model=model,
+            train_dataloader=train_loader,
+            val_dataloader=val_loader,
+            config=config,
+            use_wandb=False,
+        )
+
+        batch = {
+            "input_ids": torch.randint(0, 100, (2, 8)),
+            "labels": torch.randint(0, 100, (2, 8)),
+        }
+
+        trainer.optimizer.zero_grad(set_to_none=True)
+        initial_params = {
+            name: param.clone() for name, param in model.named_parameters() if param.requires_grad
+        }
+
+        trainer.train_step(batch)
+
+        # After first accumulation step no optimizer update should have occurred
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                assert torch.equal(param, initial_params[name])
+
+        trainer.train_step(batch)
+        trainer._optimizer_step()
+
+        # Optimizer step should clear gradients
+        for param in model.parameters():
+            if param.requires_grad:
+                assert param.grad is None
+
+        assert any(
+            not torch.equal(model.state_dict()[name], initial_params[name])
+            for name in initial_params
+        )
 
     def test_evaluate(self, minimal_config, mock_dataloaders):
         """Test evaluation function."""
@@ -196,6 +252,46 @@ class TestTrainer:
             assert trainer.best_val_loss == 2.5
             assert "model_state_dict" in loaded_checkpoint
             assert "optimizer_state_dict" in loaded_checkpoint
+
+    def test_trainer_creates_nested_directories(
+        self, minimal_config, mock_dataloaders, tmp_path
+    ):
+        """Trainer should create nested checkpoint directories automatically."""
+
+        model = TinyGPT(**minimal_config["model"])
+        train_loader, val_loader = mock_dataloaders
+
+        nested_dir = tmp_path / "deep" / "nest" / "ckpts"
+        Trainer(
+            model=model,
+            train_dataloader=train_loader,
+            val_dataloader=val_loader,
+            config=minimal_config,
+            save_dir=str(nested_dir),
+            use_wandb=False,
+        )
+
+        assert nested_dir.exists()
+
+    def test_optimizer_selection(self, minimal_config, mock_dataloaders):
+        """Optimizer choice respects configuration."""
+
+        config = deepcopy(minimal_config)
+        config["training"]["optimizer"] = "sgd"
+        config["training"]["optimizer_kwargs"] = {"momentum": 0.8}
+
+        model = TinyGPT(**config["model"])
+        train_loader, val_loader = mock_dataloaders
+
+        trainer = Trainer(
+            model=model,
+            train_dataloader=train_loader,
+            val_dataloader=val_loader,
+            config=config,
+            use_wandb=False,
+        )
+
+        assert isinstance(trainer.optimizer, torch.optim.SGD)
 
     @patch("wandb.init")
     @patch("wandb.watch")

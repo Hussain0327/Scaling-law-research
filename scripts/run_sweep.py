@@ -1,22 +1,15 @@
-"""
-Script to run parameter sweeps for scaling law experiments.
-Supports sweeping across different model configurations.
-"""
+"""Script to run parameter sweeps for scaling law experiments."""
 
-import os
 import sys
 import json
 import argparse
-import itertools
+from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Any
 import yaml
-import subprocess
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from train import main as train_main
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
@@ -46,7 +39,7 @@ def generate_sweep_configs(base_config: Dict[str, Any]) -> List[Dict[str, Any]]:
     configs = []
 
     for value in values:
-        config = base_config.copy()
+        config = deepcopy(base_config)
 
         # Remove sweep section from config
         del config["sweep"]
@@ -85,7 +78,7 @@ def generate_sweep_configs(base_config: Dict[str, Any]) -> List[Dict[str, Any]]:
             # Create configs for each combination of primary and secondary parameters
             secondary_configs = []
             for secondary_value in secondary_values:
-                secondary_config = config.copy()
+                secondary_config = deepcopy(config)
 
                 if "." in secondary_param:
                     keys = secondary_param.split(".")
@@ -127,6 +120,8 @@ def run_single_experiment(
     Returns:
         Experiment results
     """
+    config = deepcopy(config)
+
     # Create experiment-specific output directory
     exp_name = config["experiment"]["name"]
     if seed is not None:
@@ -146,8 +141,6 @@ def run_single_experiment(
 
     try:
         # Run training
-        import tempfile
-        import sys
         from train import setup_experiment, Trainer
 
         # Setup experiment
@@ -233,7 +226,7 @@ def run_sweep(
         for j, seed in enumerate(seeds):
             print(f"Seed {j+1}/{len(seeds)}: {seed}")
 
-            result = run_single_experiment(config, output_dir, seed)
+            result = run_single_experiment(deepcopy(config), output_dir, seed)
             all_results.append(result)
 
     # Save sweep summary
@@ -249,7 +242,7 @@ def run_sweep(
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
 
-    print(f"\nSweep completed!")
+    print("\nSweep completed!")
     print(
         f"Successful experiments: {summary['successful_experiments']}/{total_experiments}"
     )

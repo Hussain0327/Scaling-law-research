@@ -1,18 +1,14 @@
-"""
-Script to analyze scaling law experiments and generate comprehensive plots.
-"""
+"""Script to analyze scaling law experiments and generate comprehensive plots."""
 
-import os
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.optimize import curve_fit
-from scipy.stats import pearsonr
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -650,11 +646,11 @@ def main():
         json.dump(results_summary, f, indent=2)
 
     print(f"\nAnalysis completed! Results saved in: {output_dir}")
-    print(f"Generated plots:")
-    print(f"  - scaling_laws.png: Overview of all scaling laws")
-    print(f"  - scaling_*_detailed.png: Detailed plots for each dimension")
-    print(f"  - performance_vs_parameters.png: Performance comparison")
-    print(f"  - efficiency_vs_compute.png: Training efficiency analysis")
+    print("Generated plots:")
+    print("  - scaling_laws.png: Overview of all scaling laws")
+    print("  - scaling_*_detailed.png: Detailed plots for each dimension")
+    print("  - performance_vs_parameters.png: Performance comparison")
+    print("  - efficiency_vs_compute.png: Training efficiency analysis")
 
 
 if __name__ == "__main__":

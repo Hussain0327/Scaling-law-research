@@ -59,25 +59,23 @@ Key observations from the training process:
 **Data Processing** (`src/data/`):
 - Character-level and subword tokenization
 - Efficient data loading with proper sequence batching
-- Support for multiple datasets (TinyStories, AG-News)
+- Support for TinyStories and configurable custom text corpora
 
 **Training Infrastructure** (`src/train.py`):
 - Flexible trainer with configurable hyperparameters
 - Automatic mixed precision support
-- Gradient accumulation for large effective batch sizes
+- Configurable gradient accumulation via `training.grad_accum_steps`
 - Checkpoint saving and resuming
 
 ### Testing Framework
 
-Developed comprehensive test suite with 150+ tests covering:
+Developed a growing automated test suite covering:
 
-- **Unit tests**: Individual component validation
+- **Unit tests**: Tokenizers, data modules, model blocks, trainer utilities
 - **Integration tests**: End-to-end training workflows
 - **Edge case tests**: Numerical stability and boundary conditions
-- **Performance tests**: Memory usage and computational scaling
-- **Stress tests**: Model behavior under extreme conditions
 
-Test coverage achieved: 85%+ across all modules
+See `TEST_COVERAGE_REPORT.md` for detailed status and planned additions.
 
 ## Experimental Setup
 
@@ -92,9 +90,8 @@ Test coverage achieved: 85%+ across all modules
 
 ### Datasets Used
 
-- **TinyStories**: Simplified narrative text for initial scaling experiments
-- **AG-News**: News classification subset for diverse text patterns
-- **Custom synthetic data**: Controlled experiments with known patterns
+- **TinyStories**: Default corpus for scaling experiments
+- **Custom text files**: Loaded via `SimpleTextDataModule` for quick experimentation
 
 ### Evaluation Metrics
 

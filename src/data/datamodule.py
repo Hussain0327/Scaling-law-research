@@ -143,7 +143,11 @@ class TinyStoriesDataModule:
         # Limit number of samples if specified
         if self.max_samples:
             train_samples = min(self.max_samples, len(dataset["train"]))
-            val_samples = min(self.max_samples // 10, len(dataset["validation"]))
+            if len(dataset["validation"]) > 0:
+                val_cap = max(1, self.max_samples // 10)
+                val_samples = min(val_cap, len(dataset["validation"]))
+            else:
+                val_samples = 0
 
             dataset["train"] = dataset["train"].select(range(train_samples))
             dataset["validation"] = dataset["validation"].select(range(val_samples))
@@ -275,6 +279,7 @@ class SimpleTextDataModule:
         self.tokenizer = None
         self.train_dataset = None
         self.val_dataset = None
+        self.test_dataset = None
 
     def load_text_file(self, file_path: str) -> List[str]:
         """Load text from file."""
@@ -333,6 +338,7 @@ class SimpleTextDataModule:
         self.val_dataset = TextDataset(
             self.val_texts, self.tokenizer, self.max_length, self.stride
         )
+        self.test_dataset = self.val_dataset
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
@@ -349,6 +355,16 @@ class SimpleTextDataModule:
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
+            collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id),
+        )
+
+    def test_dataloader(self) -> DataLoader:
+        target_dataset = self.test_dataset if self.test_dataset is not None else self.val_dataset
+        return DataLoader(
+            target_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=0,
             collate_fn=lambda x: collate_fn(x, self.tokenizer.pad_token_id),
         )
 

@@ -385,6 +385,25 @@ class TestSimpleTextDataModule:
         finally:
             Path(temp_path).unlink()
 
+    def test_simple_text_test_dataloader(self):
+        """Test that test dataloader mirrors validation loader when no explicit test set."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as train_f:
+            train_f.write("Sample line one\nSample line two\n")
+            train_path = train_f.name
+
+        try:
+            datamodule = SimpleTextDataModule(train_file=train_path, batch_size=1)
+            datamodule.prepare_data()
+            datamodule.setup_tokenizer()
+            datamodule.setup_datasets()
+
+            loader = datamodule.test_dataloader()
+            batch = next(iter(loader))
+
+            assert "input_ids" in batch
+        finally:
+            Path(train_path).unlink()
+
 
 class TestDataModuleFactory:
     """Test data module factory function."""
@@ -405,6 +424,43 @@ class TestDataModuleFactory:
         """Test error with invalid dataset name."""
         with pytest.raises(ValueError):
             create_datamodule("invalid_dataset")
+
+
+class DummySplit:
+    def __init__(self, texts):
+        self.texts = list(texts)
+
+    def __len__(self):
+        return len(self.texts)
+
+    def select(self, indices):
+        selected = [self.texts[i] for i in indices]
+        return DummySplit(selected)
+
+    def __iter__(self):
+        for text in self.texts:
+            yield {"text": text}
+
+    def __getitem__(self, index):
+        return {"text": self.texts[index]}
+
+
+@patch("data.datamodule.load_dataset")
+def test_tinystories_small_subset_has_validation(mock_load_dataset):
+    """Ensure validation split is non-empty even for tiny subsets."""
+
+    mock_dataset = {
+        "train": DummySplit(["train"] * 5),
+        "validation": DummySplit(["val"] * 5),
+    }
+    mock_load_dataset.return_value = mock_dataset
+
+    datamodule = TinyStoriesDataModule(max_samples=5, tokenizer_type="char")
+    datamodule.prepare_data()
+    datamodule.setup_tokenizer()
+    datamodule.setup_datasets()
+
+    assert len(datamodule.val_dataset) >= 1
 
 
 if __name__ == "__main__":

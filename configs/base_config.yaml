@@ -27,6 +27,7 @@ training:
   warmup_steps: 100
   max_grad_norm: 1.0
   use_amp: true
+  grad_accum_steps: 1
   eval_interval: 200
   save_interval: 500
   log_interval: 50

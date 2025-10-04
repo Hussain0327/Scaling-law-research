@@ -198,11 +198,7 @@ reproduce: ## Reproduce main paper results (3-seed runs)
 	done
 
 	# Evaluate and analyze results
-	@echo "$(BLUE)Analyzing reproduction results...$(NC)"
-	@cd $(SRC_DIR) && $(PYTHON) ../scripts/analyze_reproduction.py \
-		--checkpoint_dir ../$(CHECKPOINTS_DIR)/reproduction \
-		--output_dir ../$(RESULTS_DIR)/reproduction
-
+	@echo "$(BLUE)Skipping automated analysis: customize with scripts/analyze_scaling.py as needed.$(NC)"
 	@echo "$(GREEN)✓ Reproduction completed!$(NC)"
 	@echo "$(YELLOW)Results saved in $(RESULTS_DIR)/reproduction/$(NC)"
 
@@ -222,12 +218,8 @@ export-model: ## Export best model for inference
 	@echo "$(GREEN)✓ Model exported$(NC)"
 
 generate-plots: ## Generate all plots and visualizations
-	@echo "$(BLUE)Generating plots...$(NC)"
-	@mkdir -p $(RESULTS_DIR)/plots
-	@cd $(SRC_DIR) && $(PYTHON) ../scripts/generate_plots.py \
-		--results_dir ../$(RESULTS_DIR) \
-		--output_dir ../$(RESULTS_DIR)/plots
-	@echo "$(GREEN)✓ Plots generated$(NC)"
+	@echo "$(BLUE)Use scripts/analyze_scaling.py to generate plots for specific checkpoint directories.$(NC)"
+	@echo "$(YELLOW)Example: python scripts/analyze_scaling.py --checkpoint_dirs checkpoints/width_scaling --output_dir results/plots$(NC)"
 
 # Development commands
 pre-commit: format lint type-check test ## Run all pre-commit checks
@@ -274,9 +266,7 @@ env-info: ## Show environment information
 
 # Performance benchmarking
 benchmark: ## Run performance benchmarks
-	@echo "$(BLUE)Running performance benchmarks...$(NC)"
-	@cd $(SRC_DIR) && $(PYTHON) ../scripts/benchmark.py
-	@echo "$(GREEN)✓ Benchmarks completed$(NC)"
+	@echo "$(YELLOW)Benchmark suite not yet implemented. Contributions welcome!$(NC)"
 
 # Full pipeline (use with caution - takes a long time)
 full-pipeline: setup test train sweep eval ## Run complete pipeline

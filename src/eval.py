@@ -123,7 +123,17 @@ class ModelEvaluator:
         data_module.setup_datasets()
 
         val_loader = data_module.val_dataloader()
-        test_loader = data_module.test_dataloader()
+        test_loader = None
+
+        if hasattr(data_module, "test_dataloader"):
+            try:
+                test_candidate = data_module.test_dataloader()
+            except TypeError:
+                test_candidate = None
+            test_loader = test_candidate
+
+        if test_loader is None:
+            test_loader = data_module.val_dataloader()
 
         results = []
 

@@ -1,8 +1,5 @@
-"""
-Script to export trained models for inference and deployment.
-"""
+"""Script to export trained models for inference and deployment."""
 
-import os
 import sys
 import json
 import argparse
@@ -14,7 +11,8 @@ from typing import Dict, Any, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from models.tiny_gpt import TinyGPT
-from data.tokenizers import CharacterTokenizer, SubwordTokenizer
+from data.tokenizers import SubwordTokenizer
+from data import datamodule as data_datamodule
 
 
 def find_best_checkpoint(checkpoint_dir: str) -> Optional[str]:
@@ -157,13 +155,13 @@ def export_model(
     elif export_format == "onnx":
         # Export as ONNX for cross-platform deployment
         try:
-            import torch.onnx
+            import torch.onnx as torch_onnx
 
             model.eval()
             example_input = torch.randint(0, model_config["vocab_size"], (1, 10))
 
             onnx_path = output_path / "model.onnx"
-            torch.onnx.export(
+            torch_onnx.export(
                 model,
                 example_input,
                 str(onnx_path),
@@ -193,16 +191,35 @@ def export_model(
     if include_tokenizer:
         try:
             # Try to recreate tokenizer from config
-            data_config = config.get("data", {})
+            data_config = dict(config.get("data", {}))
             tokenizer_type = data_config.get("tokenizer_type", "char")
 
             if tokenizer_type == "char":
-                # For character tokenizer, we need the vocabulary
-                # This is a limitation - we'd need to save the tokenizer during training
-                print(
-                    "Warning: Character tokenizer vocabulary not available in checkpoint."
-                )
-                print("Consider saving tokenizer during training for complete export.")
+                tokenizer_saved = False
+
+                try:
+                    data_module = data_datamodule.create_datamodule(**data_config)
+                    data_module.prepare_data()
+                    data_module.setup_tokenizer()
+                    tokenizer = getattr(data_module, "tokenizer", None)
+
+                    if tokenizer and hasattr(tokenizer, "save"):
+                        tokenizer_path = output_path / "tokenizer.json"
+                        tokenizer.save(tokenizer_path)
+                        tokenizer_saved = True
+                        print(f"Tokenizer saved to: {tokenizer_path}")
+                except Exception as exc:  # pragma: no cover - best effort fallback
+                    print(
+                        f"Warning: Could not rebuild tokenizer during export: {exc}"
+                    )
+
+                if not tokenizer_saved:
+                    print(
+                        "Warning: Character tokenizer vocabulary not available in checkpoint."
+                    )
+                    print(
+                        "Consider saving tokenizer artifacts during training for complete export."
+                    )
 
             elif tokenizer_type == "subword":
                 tokenizer = SubwordTokenizer(data_config.get("model_name", "gpt2"))
@@ -227,7 +244,7 @@ def export_model(
             print(f"Warning: Could not export tokenizer: {e}")
 
     # Create inference script template
-    inference_script = f'''"""
+    inference_script = '''"""
 Inference script for exported TinyGPT model.
 Generated automatically during model export.
 """
