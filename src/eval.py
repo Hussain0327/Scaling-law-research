@@ -12,12 +12,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import yaml
 from scipy.optimize import curve_fit
-from tqdm import tqdm
 
+import yaml
 from data.datamodule import create_datamodule
 from models.tiny_gpt import TinyGPT
+from tqdm import tqdm
 
 
 class ModelEvaluator:

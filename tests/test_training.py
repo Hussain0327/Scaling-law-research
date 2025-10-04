@@ -12,8 +12,8 @@ sys.path.append("src")
 
 import pytest  # noqa: E402
 import torch  # noqa: E402
-import yaml  # noqa: E402
 
+import yaml  # noqa: E402
 from models.tiny_gpt import TinyGPT  # noqa: E402
 from train import Trainer, load_config, setup_experiment  # noqa: E402
 
