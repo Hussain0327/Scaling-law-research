@@ -138,7 +138,7 @@ class TestTrainer:
         assert isinstance(loss, float)
         assert loss > 0
 
-        # Ensure gradients are populated but parameters remain unchanged until optimizer step
+        # Gradients should exist before optimizer updates parameters
         for name, param in model.named_parameters():
             if param.requires_grad:
                 assert param.grad is not None
@@ -149,13 +149,20 @@ class TestTrainer:
         for name, param in model.named_parameters():
             if param.requires_grad:
                 assert not torch.equal(
-                    param, initial_params[name]
-                ), f"Parameter {name} was not updated"
+                    param,
+                    initial_params[name],
+                ), (
+                    f"Param '{name}' stayed unchanged after optimizer step; "
+                    "check gradients."
+                )
 
     def test_grad_accumulation_respects_step_frequency(
         self, minimal_config, mock_dataloaders
     ):
-        """Gradient accumulation delays optimizer steps until the configured threshold."""
+        """
+        Gradient accumulation delays optimizer steps until the configured
+        threshold is reached.
+        """
         config = deepcopy(minimal_config)
         config["training"]["grad_accum_steps"] = 2
 
@@ -184,7 +191,7 @@ class TestTrainer:
 
         trainer.train_step(batch)
 
-        # After first accumulation step no optimizer update should have occurred
+        # First accumulation step should not trigger optimizer update
         for name, param in model.named_parameters():
             if param.requires_grad:
                 assert torch.equal(param, initial_params[name])
@@ -198,7 +205,10 @@ class TestTrainer:
                 assert param.grad is None
 
         assert any(
-            not torch.equal(model.state_dict()[name], initial_params[name])
+            not torch.equal(
+                model.state_dict()[name],
+                initial_params[name],
+            )
             for name in initial_params
         )
 
@@ -258,7 +268,9 @@ class TestTrainer:
     def test_trainer_creates_nested_directories(
         self, minimal_config, mock_dataloaders, tmp_path
     ):
-        """Trainer should create nested checkpoint directories automatically."""
+        """
+        Trainer should create nested checkpoint directories automatically.
+        """
 
         model = TinyGPT(**minimal_config["model"])
         train_loader, val_loader = mock_dataloaders
@@ -326,9 +338,13 @@ class TestConfigLoading:
             "training": {"num_epochs": 5, "learning_rate": 1e-4},
         }
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump(config_data, f)
-            temp_path = f.name
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".yaml",
+            delete=False,
+        ) as temp_file:
+            yaml.dump(config_data, temp_file)
+            temp_path = temp_file.name
 
         try:
             loaded_config = load_config(temp_path)
@@ -338,9 +354,13 @@ class TestConfigLoading:
 
     def test_load_invalid_config(self):
         """Test loading invalid configuration file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write("invalid: yaml: content: [")
-            temp_path = f.name
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".yaml",
+            delete=False,
+        ) as temp_file:
+            temp_file.write("invalid: yaml: content: [")
+            temp_path = temp_file.name
 
         try:
             with pytest.raises(yaml.YAMLError):
@@ -394,7 +414,10 @@ class TestExperimentSetup:
         mock_datamodule.setup_datasets.assert_called_once()
 
     @patch("data.datamodule.create_datamodule")
-    def test_setup_experiment_vocab_size_mismatch(self, mock_create_datamodule):
+    def test_setup_experiment_vocab_size_mismatch(
+        self,
+        mock_create_datamodule,
+    ):
         """Test experiment setup when vocab sizes don't match."""
         config = {
             "model": {
@@ -503,7 +526,9 @@ class TestTrainingIntegration:
             assert len(checkpoint_files) > 0
 
     def test_gradient_accumulation_equivalent(self):
-        """Test that training with different batch sizes gives similar results."""
+        """
+        Test that training with different batch sizes gives similar results.
+        """
         torch.manual_seed(42)
 
         config = {
@@ -572,8 +597,10 @@ class TestTrainingIntegration:
 
         loss2 = trainer2.train_step(create_fixed_batch(2))
 
-        # Losses should be similar (within reasonable tolerance due to batching effects)
-        assert abs(loss1 - loss2) < 0.5, f"Losses too different: {loss1} vs {loss2}"
+        # Losses should be similar within a reasonable tolerance
+        assert abs(loss1 - loss2) < 0.5, (
+            f"Losses too different: {loss1} vs {loss2}"
+        )
 
 
 if __name__ == "__main__":
