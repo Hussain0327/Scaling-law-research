@@ -150,7 +150,7 @@ workflow is:
 | Run / Config | Stage | Val Loss | Val Perplexity | Notes |
 |--------------|-------|----------|----------------|-------|
 | `sample_custom` | Baseline (0 epochs) | 3.5752 | 35.70 | From `results/sample_custom/baseline.csv` (random weights) |
-| `sample_custom` | After training (10 epochs) | 3.0778 | 21.71 | From `results/sample_custom/post_training.csv`; best loss 3.0710 |
+| `sample_custom` | After training (10 epochs) | 3.0959 | 22.11 | From `results/sample_custom/post_training.csv`; best loss 3.0788 |
 
 > Tip: the raw CSVs live in `results/sample_custom/`. Update or append rows when
 > you repeat the experiment with new seeds or configs.
