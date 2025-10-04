@@ -177,7 +177,9 @@ class TestTrainer:
 
         trainer.optimizer.zero_grad(set_to_none=True)
         initial_params = {
-            name: param.clone() for name, param in model.named_parameters() if param.requires_grad
+            name: param.clone()
+            for name, param in model.named_parameters()
+            if param.requires_grad
         }
 
         trainer.train_step(batch)

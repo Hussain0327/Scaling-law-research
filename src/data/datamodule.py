@@ -359,7 +359,9 @@ class SimpleTextDataModule:
         )
 
     def test_dataloader(self) -> DataLoader:
-        target_dataset = self.test_dataset if self.test_dataset is not None else self.val_dataset
+        target_dataset = (
+            self.test_dataset if self.test_dataset is not None else self.val_dataset
+        )
         return DataLoader(
             target_dataset,
             batch_size=self.batch_size,

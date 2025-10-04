@@ -387,7 +387,9 @@ class TestSimpleTextDataModule:
 
     def test_simple_text_test_dataloader(self):
         """Test that test dataloader mirrors validation loader when no explicit test set."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as train_f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as train_f:
             train_f.write("Sample line one\nSample line two\n")
             train_path = train_f.name
 

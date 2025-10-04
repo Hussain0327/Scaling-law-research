@@ -209,9 +209,7 @@ def export_model(
                         tokenizer_saved = True
                         print(f"Tokenizer saved to: {tokenizer_path}")
                 except Exception as exc:  # pragma: no cover - best effort fallback
-                    print(
-                        f"Warning: Could not rebuild tokenizer during export: {exc}"
-                    )
+                    print(f"Warning: Could not rebuild tokenizer during export: {exc}")
 
                 if not tokenizer_saved:
                     print(

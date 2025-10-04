@@ -69,7 +69,9 @@ class Trainer:
         self.optimizer = self._build_optimizer()
 
         # Learning rate scheduler
-        steps_per_epoch = max(1, math.ceil(len(train_dataloader) / self.grad_accum_steps))
+        steps_per_epoch = max(
+            1, math.ceil(len(train_dataloader) / self.grad_accum_steps)
+        )
         total_steps = steps_per_epoch * self.num_epochs
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=total_steps, eta_min=self.learning_rate * 0.1
@@ -300,7 +302,11 @@ class Trainer:
                     batches_in_step = self.grad_accum_steps
                 elif batch_idx + 1 == num_batches:
                     should_step = accumulation_counter > 0
-                    batches_in_step = accumulation_counter if accumulation_counter > 0 else self.grad_accum_steps
+                    batches_in_step = (
+                        accumulation_counter
+                        if accumulation_counter > 0
+                        else self.grad_accum_steps
+                    )
 
                 if should_step:
                     self._optimizer_step()
