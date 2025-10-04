@@ -154,6 +154,8 @@ workflow is:
 
 > Tip: the raw CSVs live in `results/sample_custom/`. Update or append rows when
 > you repeat the experiment with new seeds or configs.
+> The GPU run above also produced `results/sample_custom_eval/evaluation_results.csv`
+> and `scaling_laws.png` for richer analysis.
 
 ---
 
