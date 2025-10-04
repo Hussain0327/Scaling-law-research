@@ -94,8 +94,12 @@ class TestCharacterTokenizer:
         texts = ["hello world"]
         tokenizer.build_vocab(texts)
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            temp_path = f.name
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".json",
+            delete=False,
+        ) as temp_file:
+            temp_path = temp_file.name
 
         try:
             # Save
@@ -123,10 +127,18 @@ class TestCharacterTokenizer:
         texts = ["hello"]
         tokenizer.build_vocab(texts)
 
-        assert tokenizer.pad_token_id == tokenizer.char_to_idx[tokenizer.pad_token]
-        assert tokenizer.unk_token_id == tokenizer.char_to_idx[tokenizer.unk_token]
-        assert tokenizer.eos_token_id == tokenizer.char_to_idx[tokenizer.eos_token]
-        assert tokenizer.bos_token_id == tokenizer.char_to_idx[tokenizer.bos_token]
+        assert tokenizer.pad_token_id == tokenizer.char_to_idx[
+            tokenizer.pad_token
+        ]
+        assert tokenizer.unk_token_id == tokenizer.char_to_idx[
+            tokenizer.unk_token
+        ]
+        assert tokenizer.eos_token_id == tokenizer.char_to_idx[
+            tokenizer.eos_token
+        ]
+        assert tokenizer.bos_token_id == tokenizer.char_to_idx[
+            tokenizer.bos_token
+        ]
 
 
 class TestSubwordTokenizer:
@@ -227,7 +239,12 @@ class TestTextDataset:
         texts = ["hello"]
         tokenizer.build_vocab(texts)
 
-        dataset = TextDataset(texts=[], tokenizer=tokenizer, max_length=10, stride=5)
+        dataset = TextDataset(
+            texts=[],
+            tokenizer=tokenizer,
+            max_length=10,
+            stride=5,
+        )
 
         assert len(dataset) == 0
 
@@ -249,7 +266,7 @@ class TestCollateFunction:
         assert collated["input_ids"].shape == (3, 4)  # batch_size=3, max_len=4
 
         # Check padding
-        assert collated["input_ids"][1, 2].item() == 0  # Second sequence padded
+        assert collated["input_ids"][1, 2].item() == 0  # Padding on second seq
         assert collated["input_ids"][1, 3].item() == 0
 
     def test_collate_with_labels(self):
@@ -286,7 +303,10 @@ class TestTinyStoriesDataModule:
     def test_data_module_initialization(self, mock_load_dataset):
         """Test data module initialization."""
         datamodule = TinyStoriesDataModule(
-            tokenizer_type="char", max_length=128, batch_size=16, max_samples=100
+            tokenizer_type="char",
+            max_length=128,
+            batch_size=16,
+            max_samples=100,
         )
 
         assert datamodule.tokenizer_type == "char"
@@ -343,7 +363,10 @@ class TestTinyStoriesDataModule:
         datamodule.setup_tokenizer()
 
         assert datamodule.tokenizer is mock_tokenizer
-        mock_create_tokenizer.assert_called_once_with("subword", model_name="gpt2")
+        mock_create_tokenizer.assert_called_once_with(
+            "subword",
+            model_name="gpt2",
+        )
 
 
 class TestSimpleTextDataModule:
@@ -351,9 +374,13 @@ class TestSimpleTextDataModule:
 
     def test_load_text_file(self):
         """Test loading text from file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("Line 1\nLine 2\n\nLine 3\n")
-            temp_path = f.name
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".txt",
+            delete=False,
+        ) as temp_file:
+            temp_file.write("Line 1\nLine 2\n\nLine 3\n")
+            temp_path = temp_file.name
 
         try:
             datamodule = SimpleTextDataModule(train_file=temp_path)
@@ -369,9 +396,13 @@ class TestSimpleTextDataModule:
 
     def test_data_splitting(self):
         """Test train/validation split."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("\n".join([f"Line {i}" for i in range(10)]))
-            temp_path = f.name
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".txt",
+            delete=False,
+        ) as temp_file:
+            temp_file.write("\n".join([f"Line {i}" for i in range(10)]))
+            temp_path = temp_file.name
 
         try:
             datamodule = SimpleTextDataModule(
@@ -386,7 +417,10 @@ class TestSimpleTextDataModule:
             Path(temp_path).unlink()
 
     def test_simple_text_test_dataloader(self):
-        """Test that test dataloader mirrors validation loader when no explicit test set."""
+        """
+        Ensure test dataloader mirrors validation loader without a dedicated
+        test set.
+        """
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False
         ) as train_f:
@@ -394,7 +428,10 @@ class TestSimpleTextDataModule:
             train_path = train_f.name
 
         try:
-            datamodule = SimpleTextDataModule(train_file=train_path, batch_size=1)
+            datamodule = SimpleTextDataModule(
+                train_file=train_path,
+                batch_size=1,
+            )
             datamodule.prepare_data()
             datamodule.setup_tokenizer()
             datamodule.setup_datasets()
