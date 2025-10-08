@@ -343,6 +343,54 @@ downstream evaluation.
 
 ---
 
+## SEAL adaptation experiments
+
+This repository ships with a lightweight SEAL (Self-Editing with Assisted
+Learning) scaffold aimed at GPT-style models. The workflow couples a policy
+model (default: an MLX-formatted GPT‑2) with LoRA-based inner edits on TinyGPT
+and logs adaptation metrics in JSONL format.
+
+1. **Convert GPT‑2 to MLX (optional on Apple Silicon):**
+   ```bash
+   mlx_lm.convert --hf-path gpt2 --mlx-path "$HOME/models/gpt2-mlx"
+   ```
+2. **Train the TinyGPT baseline:**
+   ```bash
+   python -m src.train \
+     --config configs/base_config.yaml \
+     --save_dir checkpoints/seal_gpt2/baseline \
+     --seed 42 \
+     --no_wandb
+   ```
+3. **Evaluate checkpoints:**
+   ```bash
+   python -m src.eval \
+     --config configs/base_config.yaml \
+     --checkpoint_dir checkpoints/seal_gpt2/baseline \
+     --output_dir results/seal_gpt2/baseline_eval
+   ```
+4. **Run the SEAL sweep (LoRA rank × inner steps):**
+   ```bash
+   python -m src.seal.run \
+     --config configs/base_config.yaml \
+     --baseline checkpoints/seal_gpt2/baseline \
+     --save_dir checkpoints/seal_gpt2/adapt \
+     --results results/seal_gpt2/adapt.jsonl \
+     --inner_steps 1 3 10 30 \
+     --lora_rank 4 8
+   ```
+5. **Generate adaptation plots:**
+   ```bash
+   python scripts/analyze_adaptation.py \
+     --logs results/seal_gpt2/adapt.jsonl \
+     --output_dir results/seal_gpt2/adapt_plots
+   ```
+
+The analysis step emits `adaptation_laws.png`, `pareto_forgetting.png`, and a
+CSV summary capturing improvements, forgetting, and token budgets.
+
+---
+
 ## Known limitations
 
 - Tiny custom corpus is intentionally small; scaling conclusions require larger datasets.
