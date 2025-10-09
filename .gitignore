@@ -52,3 +52,9 @@ wandb/
 # OS
 .DS_Store
 Thumbs.db
+ 
+# Additional ignores
+result/
+.ipynb_checkpoints/
+*.ipynb
+venv*/

@@ -1,7 +1,7 @@
-# Makefile for TinyLM Scaling Laws Research Project
-# Provides automation for setup, testing, training, and reproduction
+# Makefile for GPT-2 QLoRA + SEAL scaffold
+# Provides automation for setup, testing, training, and basic sweeps
 
-.PHONY: help setup install test lint format clean train eval sweep reproduce
+.PHONY: help setup install test lint format clean train-gpt2 eval-gpt2 seal sweep
 .DEFAULT_GOAL := help
 
 # Variables
@@ -47,7 +47,7 @@ install: setup ## Alias for setup
 
 test: ## Run all unit tests with coverage
 	@echo "$(BLUE)Running unit tests...$(NC)"
-	@cd $(SRC_DIR) && $(PYTHON) -m pytest ../$(TEST_DIR) -v --cov=$(SRC_DIR) --cov-report=term-missing --cov-report=html:../$(RESULTS_DIR)/coverage_html
+	@$(PYTHON) -m pytest $(TEST_DIR) -v
 	@echo "$(GREEN)✓ Tests completed$(NC)"
 
 test-models: ## Run only model tests
@@ -87,14 +87,15 @@ clean: ## Clean up generated files and directories
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
 # Training commands
-train: ## Run baseline training experiment
-	@echo "$(BLUE)Running baseline training experiment...$(NC)"
-	@mkdir -p $(CHECKPOINTS_DIR)/baseline
-	@cd $(SRC_DIR) && $(PYTHON) train.py \
-		--config ../$(CONFIG_DIR)/base_config.yaml \
-		--save_dir ../$(CHECKPOINTS_DIR)/baseline \
-		--seed 42
-	@echo "$(GREEN)✓ Baseline training completed$(NC)"
+train-gpt2: ## Train GPT-2 Small with QLoRA (demo)
+	@echo "$(BLUE)Training GPT-2 Small with QLoRA...$(NC)"
+	@$(PYTHON) -m src.gpt2_qlora.train \
+		--model_name gpt2 \
+		--train_file data/sample/train.txt \
+		--output_dir $(CHECKPOINTS_DIR)/gpt2_qlora_demo \
+		--lora_r 8 --lora_alpha 16 --lora_dropout 0.05 \
+		--block_size 128 --batch_size 2 --epochs 1 --lr 1e-4
+	@echo "$(GREEN)✓ Training completed$(NC)"
 
 train-width: ## Run width scaling experiments
 	@echo "$(BLUE)Running width scaling experiments...$(NC)"
@@ -129,14 +130,14 @@ train-data: ## Run data scaling experiments
 	@echo "$(GREEN)✓ Data scaling experiments completed$(NC)"
 
 # Evaluation commands
-eval: ## Evaluate trained models and generate plots
-	@echo "$(BLUE)Evaluating models...$(NC)"
+eval-gpt2: ## Evaluate GPT-2 perplexity
+	@echo "$(BLUE)Evaluating GPT-2 perplexity...$(NC)"
 	@mkdir -p $(RESULTS_DIR)/evaluation
-	@cd $(SRC_DIR) && $(PYTHON) eval.py \
-		--config ../$(CONFIG_DIR)/base_config.yaml \
-		--checkpoint_dir ../$(CHECKPOINTS_DIR)/baseline \
-		--output_dir ../$(RESULTS_DIR)/evaluation \
-		--generate_samples
+	@$(PYTHON) -m src.gpt2_qlora.eval \
+		--model_name gpt2 \
+		--adapter_dir $(CHECKPOINTS_DIR)/gpt2_qlora_demo \
+		--eval_file data/sample/train.txt \
+		--block_size 128 --max_batches 10
 	@echo "$(GREEN)✓ Evaluation completed$(NC)"
 
 eval-scaling: ## Evaluate scaling law experiments
@@ -148,8 +149,13 @@ eval-scaling: ## Evaluate scaling law experiments
 	@echo "$(GREEN)✓ Scaling analysis completed$(NC)"
 
 # Sweep and ablation commands
-sweep: train-width train-depth train-context train-data ## Run all scaling experiments
-	@echo "$(GREEN)✓ All scaling experiments completed$(NC)"
+sweep: ## Run a simple LoRA rank sweep
+	@echo "$(BLUE)Running QLoRA sweep...$(NC)"
+	@$(PYTHON) scripts/run_qlora_sweep.py \
+		--train_file data/sample/train.txt \
+		--output_dir $(CHECKPOINTS_DIR)/gpt2_sweep \
+		--lora_r 4 8
+	@echo "$(GREEN)✓ Sweep completed$(NC)"
 
 ablation-tokenizer: ## Run tokenizer ablation study
 	@echo "$(BLUE)Running tokenizer ablation...$(NC)"
@@ -203,10 +209,7 @@ reproduce: ## Reproduce main paper results (3-seed runs)
 	@echo "$(YELLOW)Results saved in $(RESULTS_DIR)/reproduction/$(NC)"
 
 # Data commands
-download-data: ## Download TinyStories dataset (will be done automatically during training)
-	@echo "$(BLUE)Checking TinyStories dataset...$(NC)"
-	@cd $(SRC_DIR) && $(PYTHON) -c "from datasets import load_dataset; load_dataset('roneneldan/TinyStories', split='train[:100]')"
-	@echo "$(GREEN)✓ Dataset available$(NC)"
+
 
 # Export and analysis commands
 export-model: ## Export best model for inference
@@ -228,14 +231,9 @@ pre-commit: format lint type-check test ## Run all pre-commit checks
 check: pre-commit ## Alias for pre-commit
 
 # Quick smoke test
-smoke-test: ## Run quick smoke test with tiny model
+smoke-test: ## Quick import + tiny tokenizer test
 	@echo "$(BLUE)Running smoke test...$(NC)"
-	@mkdir -p $(CHECKPOINTS_DIR)/smoke_test
-	@cd $(SRC_DIR) && $(PYTHON) train.py \
-		--config ../$(CONFIG_DIR)/base_config.yaml \
-		--save_dir ../$(CHECKPOINTS_DIR)/smoke_test \
-		--no_wandb \
-		--seed 42 | head -20
+	@$(PYTHON) -c "from transformers import AutoTokenizer; t=AutoTokenizer.from_pretrained('gpt2'); print('EOS:', t.eos_token)"
 	@echo "$(GREEN)✓ Smoke test completed$(NC)"
 
 # Status and info commands

@@ -1,19 +1,7 @@
-"""
-Neural network models and components.
+"""Model namespace placeholder.
+
+This project now targets Hugging Face GPT‑2 models (loaded via `transformers`).
+No local model implementations are shipped.
 """
 
-from .tiny_gpt import (
-    MLP,
-    MultiHeadAttention,
-    TinyGPT,
-    TransformerBlock,
-    create_tiny_gpt,
-)
-
-__all__ = [
-    "TinyGPT",
-    "TransformerBlock",
-    "MultiHeadAttention",
-    "MLP",
-    "create_tiny_gpt",
-]
+__all__ = []
