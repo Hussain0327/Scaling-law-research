@@ -57,4 +57,5 @@ Thumbs.db
 result/
 .ipynb_checkpoints/
 *.ipynb
+!AI_Research.ipynb
 venv*/
