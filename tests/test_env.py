@@ -5,6 +5,7 @@ key modules import successfully and that a tiny forward pass can be wired when
 using a toy GPT-2 variant.
 """
 
+
 def test_imports():
     import transformers  # noqa: F401
     import datasets  # noqa: F401
@@ -16,4 +17,3 @@ def test_basic_tokenizer():
 
     tok = AutoTokenizer.from_pretrained("gpt2")
     assert tok.eos_token is not None
-

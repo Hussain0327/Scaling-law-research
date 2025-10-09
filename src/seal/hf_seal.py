@@ -100,11 +100,15 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     if args.data_format == "jsonl":
-        ds = load_dataset("json", data_files={"train": args.train_file, "val": args.val_file})
+        ds = load_dataset(
+            "json", data_files={"train": args.train_file, "val": args.val_file}
+        )
         remove_cols = [args.text_key]
         text_key = args.text_key
     else:
-        ds = load_dataset("text", data_files={"train": args.train_file, "val": args.val_file})
+        ds = load_dataset(
+            "text", data_files={"train": args.train_file, "val": args.val_file}
+        )
         remove_cols = ["text"]
         text_key = "text"
     ds_tok = ds.map(
@@ -113,7 +117,9 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         remove_columns=remove_cols,
     )
     collator = DataCollatorForLanguageModeling(tokenizer=tok, mlm=False)
-    train_dl = DataLoader(ds_tok["train"], batch_size=2, shuffle=True, collate_fn=collator)
+    train_dl = DataLoader(
+        ds_tok["train"], batch_size=2, shuffle=True, collate_fn=collator
+    )
     val_dl = DataLoader(ds_tok["val"], batch_size=2, shuffle=False, collate_fn=collator)
 
     results: list[AdaptRecord] = []
@@ -132,6 +138,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
 
             # Fresh adapter per budget
             from peft import PeftModel
+
             model_lora = None
             if args.baseline_adapter:
                 try:
@@ -139,14 +146,22 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
                 except Exception:
                     model_lora = None
             if model_lora is None:
-                lcfg = LoraConfig(r=rank, lora_alpha=max(16, rank * 2), lora_dropout=0.05, bias="none", task_type="CAUSAL_LM")
+                lcfg = LoraConfig(
+                    r=rank,
+                    lora_alpha=max(16, rank * 2),
+                    lora_dropout=0.05,
+                    bias="none",
+                    task_type="CAUSAL_LM",
+                )
                 model_lora = get_peft_model(base, lcfg)
 
             # Evaluate before
             val_before = _eval_loss(model_lora, val_dl, device)
             train_before = _eval_loss(model_lora, train_dl, device)
 
-            opt = torch.optim.AdamW([p for p in model_lora.parameters() if p.requires_grad], lr=args.lr)
+            opt = torch.optim.AdamW(
+                [p for p in model_lora.parameters() if p.requires_grad], lr=args.lr
+            )
             model_lora.train().to(device)
             tokens_processed = 0
             it = _cycle(train_dl)

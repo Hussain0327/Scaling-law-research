@@ -4,6 +4,7 @@ from datasets import load_dataset
 from pathlib import Path
 import os
 
+
 def main():
     model_name = "gpt2"
     output_dir = "./checkpoints/seal_gpt2"
@@ -26,14 +27,21 @@ def main():
     # 3️⃣ Load dataset
     dataset = load_dataset(
         "text",
-        data_files={"train": "data/sample/train.txt", "validation": "data/sample/val.txt"}
+        data_files={
+            "train": "data/sample/train.txt",
+            "validation": "data/sample/val.txt",
+        },
     )
 
     # 4️⃣ Tokenize
     def tokenize_fn(examples):
-        return tokenizer(examples["text"], truncation=True, padding="max_length", max_length=128)
+        return tokenizer(
+            examples["text"], truncation=True, padding="max_length", max_length=128
+        )
 
-    tokenized_dataset = dataset.map(tokenize_fn, batched=True, num_proc=2, remove_columns=["text"])
+    tokenized_dataset = dataset.map(
+        tokenize_fn, batched=True, num_proc=2, remove_columns=["text"]
+    )
 
     # 5️⃣ Training args
     training_args = TrainingArguments(
@@ -47,7 +55,7 @@ def main():
         weight_decay=0.01,
         logging_dir="./logs",
         logging_steps=10,
-        report_to="none"
+        report_to="none",
     )
 
     # 6️⃣ Trainer
@@ -65,6 +73,7 @@ def main():
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     trainer.save_model(output_dir)
     print(f"✅ Fine-tuned model saved to {output_dir}")
+
 
 if __name__ == "__main__":
     main()

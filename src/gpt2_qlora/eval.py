@@ -109,9 +109,13 @@ def main(argv: Optional[list[str]] = None) -> None:
     )
 
     from torch.utils.data import DataLoader
+
     collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     dl = DataLoader(
-        tokenized["eval"], batch_size=args.batch_size, shuffle=False, collate_fn=collator
+        tokenized["eval"],
+        batch_size=args.batch_size,
+        shuffle=False,
+        collate_fn=collator,
     )
 
     bnb = _bnb_config()
@@ -128,6 +132,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     # Optionally limit batches
     if args.max_batches is not None:
         from itertools import islice
+
         dl_iter = islice(iter(dl), args.max_batches)
         metrics = evaluate(model, dl_iter, device)
     else:
