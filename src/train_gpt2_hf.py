@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-import torch
 from datasets import load_dataset
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
 
