@@ -7,9 +7,9 @@ using a toy GPT-2 variant.
 
 
 def test_imports():
-    import transformers  # noqa: F401
     import datasets  # noqa: F401
     import peft  # noqa: F401
+    import transformers  # noqa: F401
 
 
 def test_basic_tokenizer():

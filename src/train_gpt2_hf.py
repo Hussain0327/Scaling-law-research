@@ -1,8 +1,9 @@
-import torch
-from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
-from datasets import load_dataset
-from pathlib import Path
 import os
+from pathlib import Path
+
+import torch
+from datasets import load_dataset
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
 
 
 def main():
