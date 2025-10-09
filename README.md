@@ -3,6 +3,7 @@
 [![CI/CD Pipeline](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Hussain0327/Ai-Research/blob/main/AI_Research.ipynb)
 
 This repository is a clean, ready-to-run scaffold focused on GPT‑2 Small with
 QLoRA (4‑bit quantization + LoRA) using Hugging Face Transformers, PEFT, and
