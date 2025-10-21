@@ -1,4 +1,4 @@
-# GPT-2 QLoRA – Scaling Law & SEAL Scaffold
+# GPT-2 QLoRA – Scaling Law & SEAL
 
 [![CI/CD Pipeline](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml/badge.svg)](https://github.com/Hussain0327/Ai-Research/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
