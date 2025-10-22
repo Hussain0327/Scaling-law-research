@@ -59,3 +59,10 @@ result/
 *.ipynb
 !AI_Research.ipynb
 venv*/
+
+# Caches
+.mypy_cache/
+
+# Local datasets and converted models (not tracked)
+data/hf/
+models/
