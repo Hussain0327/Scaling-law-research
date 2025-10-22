@@ -25,13 +25,19 @@ from transformers import (
 )
 
 
-def _bnb() -> BitsAndBytesConfig:
-    return BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-    )
+def _try_bnb() -> tuple[bool, BitsAndBytesConfig | None]:
+    """Detect bitsandbytes availability and return a 4-bit config if possible."""
+    try:
+        import bitsandbytes  # noqa: F401
+
+        return True, BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,
+        )
+    except Exception:
+        return False, None
 
 
 def _tokenize(examples, tokenizer, block_size: int, text_key: str):
@@ -90,7 +96,12 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     p.add_argument("--lr", type=float, default=5e-4)
     args = p.parse_args(list(argv) if argv is not None else None)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     args.save_dir.mkdir(parents=True, exist_ok=True)
     args.results.parent.mkdir(parents=True, exist_ok=True)
 
@@ -127,13 +138,22 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     try:
         for steps, rank in product(args.inner_steps, args.lora_rank):
             # Fresh base + adapter per setting
-            base = AutoModelForCausalLM.from_pretrained(
-                args.model_name,
-                quantization_config=_bnb(),
-                device_map="auto",
-            )
-            base.gradient_checkpointing_enable()
-            base = prepare_model_for_kbit_training(base)
+            use_bnb, bnb = _try_bnb()
+            if use_bnb:
+                base = AutoModelForCausalLM.from_pretrained(
+                    args.model_name,
+                    quantization_config=bnb,
+                    device_map="auto",
+                )
+                base.gradient_checkpointing_enable()
+                base = prepare_model_for_kbit_training(base)
+            else:
+                # Fallback to standard precision LoRA if 4-bit is unavailable
+                torch_dtype = torch.float16 if device.type in {"cuda", "mps"} else torch.float32
+                base = AutoModelForCausalLM.from_pretrained(
+                    args.model_name,
+                    torch_dtype=torch_dtype,
+                )
 
             # Fresh adapter per budget
             from peft import PeftModel

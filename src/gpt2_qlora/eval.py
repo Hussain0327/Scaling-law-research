@@ -26,13 +26,24 @@ except Exception:  # pragma: no cover
     PeftModel = None  # type: ignore[assignment]
 
 
-def _bnb_config() -> BitsAndBytesConfig:
-    return BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-    )
+def _try_bnb_config() -> tuple[bool, BitsAndBytesConfig | None]:
+    """Return (use_bnb, config) where use_bnb is True only if bitsandbytes is available.
+
+    On macOS (Apple Silicon) bitsandbytes 4-bit is typically unavailable. In that case,
+    fall back to standard full-precision evaluation so we can still compute perplexity.
+    """
+    try:
+        import bitsandbytes  # noqa: F401
+
+        cfg = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,
+        )
+        return True, cfg
+    except Exception:
+        return False, None
 
 
 def _tokenize(examples, tokenizer, block_size: int, text_key: str):
@@ -85,9 +96,28 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--max_batches", type=int, default=None)
     args = parser.parse_args(argv)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Prefer CUDA, then MPS (Apple), else CPU
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 
-    tokenizer = AutoTokenizer.from_pretrained(args.adapter_dir or args.model_name)
+    # Prefer tokenizer from adapter_dir only if it exists and includes tokenizer files;
+    # otherwise use the base model's tokenizer.
+    tok_src = args.model_name
+    if args.adapter_dir:
+        from pathlib import Path as _P
+
+        ap = _P(args.adapter_dir)
+        if ap.exists() and (
+            (ap / "tokenizer.json").exists()
+            or (ap / "vocab.json").exists()
+            or (ap / "tokenizer.model").exists()
+        ):
+            tok_src = args.adapter_dir
+    tokenizer = AutoTokenizer.from_pretrained(tok_src)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -116,13 +146,21 @@ def main(argv: Optional[list[str]] = None) -> None:
         collate_fn=collator,
     )
 
-    bnb = _bnb_config()
+    use_bnb, bnb = _try_bnb_config()
     # Always load base from model_name; attach adapter if provided
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_name,
-        quantization_config=bnb,
-        device_map="auto",
-    )
+    if use_bnb:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_name,
+            quantization_config=bnb,
+            device_map="auto",
+        )
+    else:
+        # Fallback to standard precision if 4-bit is not available
+        torch_dtype = torch.float16 if device.type in {"cuda", "mps"} else torch.float32
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_name,
+            torch_dtype=torch_dtype,
+        )
 
     if args.adapter_dir and PeftModel is not None:
         model = PeftModel.from_pretrained(model, args.adapter_dir)

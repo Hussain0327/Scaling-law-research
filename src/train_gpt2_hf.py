@@ -2,7 +2,14 @@ import os
 from pathlib import Path
 
 from datasets import load_dataset
-from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
+from transformers import (
+    GPT2LMHeadModel,
+    GPT2Tokenizer,
+    Trainer,
+    TrainingArguments,
+    DataCollatorForLanguageModeling,
+)
+import inspect
 
 
 def main():
@@ -44,26 +51,37 @@ def main():
     )
 
     # 5️⃣ Training args
-    training_args = TrainingArguments(
-        output_dir=output_dir,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        learning_rate=5e-5,
-        per_device_train_batch_size=2,
-        per_device_eval_batch_size=2,
-        num_train_epochs=3,
-        weight_decay=0.01,
-        logging_dir="./logs",
-        logging_steps=10,
-        report_to="none",
-    )
+    # Version-safe TrainingArguments
+    kwargs = {
+        "output_dir": output_dir,
+        "learning_rate": 5e-5,
+        "per_device_train_batch_size": 2,
+        "per_device_eval_batch_size": 2,
+        "num_train_epochs": 3,
+        "weight_decay": 0.01,
+        "logging_dir": "./logs",
+        "logging_steps": 10,
+        "report_to": "none",
+    }
+    sig = inspect.signature(TrainingArguments.__init__)
+    if "evaluation_strategy" in sig.parameters:
+        kwargs["evaluation_strategy"] = "epoch"
+    elif "eval_strategy" in sig.parameters:
+        kwargs["eval_strategy"] = "epoch"
+    if "save_strategy" in sig.parameters:
+        kwargs["save_strategy"] = "epoch"
+
+    training_args = TrainingArguments(**kwargs)
 
     # 6️⃣ Trainer
+    collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["validation"],
+        data_collator=collator,
+        tokenizer=tokenizer,
     )
 
     # 7️⃣ Train

@@ -140,6 +140,21 @@ eval-gpt2: ## Evaluate GPT-2 perplexity
 		--block_size 128 --max_batches 10
 	@echo "$(GREEN)✓ Evaluation completed$(NC)"
 
+seal: ## Run a tiny SEAL-style adaptation (LoRA, falls back if 4-bit unavailable)
+	@echo "$(BLUE)Running SEAL-style adaptation (tiny test)...$(NC)"
+	@mkdir -p $(CHECKPOINTS_DIR)/gpt2_seal/adapt $(RESULTS_DIR)/gpt2_seal
+	@$(PYTHON) -m src.seal.hf_seal \
+		--model_name gpt2 \
+		--baseline_adapter $(CHECKPOINTS_DIR)/gpt2_qlora_demo \
+		--save_dir $(CHECKPOINTS_DIR)/gpt2_seal/adapt \
+		--results $(RESULTS_DIR)/gpt2_seal/adapt.jsonl \
+		--inner_steps 1 \
+		--lora_rank 4 \
+		--train_file data/sample/train.txt \
+		--val_file data/sample/train.txt \
+		--block_size 64
+	@echo "$(GREEN)✓ SEAL tiny run completed$(NC)"
+
 eval-scaling: ## Evaluate scaling law experiments
 	@echo "$(BLUE)Evaluating scaling experiments...$(NC)"
 	@mkdir -p $(RESULTS_DIR)/scaling_analysis
