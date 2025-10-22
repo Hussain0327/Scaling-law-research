@@ -1,4 +1,5 @@
-"""QLoRA training script for GPT-2 Small (HF + PEFT + bitsandbytes).
+"""
+QLoRA training script for GPT-2 Small (HF + PEFT + bitsandbytes).
 
 Designed for Google Colab GPUs. Trains LoRA adapters on top of a 4-bit GPT-2
 base and saves the adapter weights alongside a small training summary.
@@ -11,6 +12,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+import inspect
 
 import torch
 from datasets import load_dataset
@@ -25,12 +27,15 @@ from transformers import (
 
 try:
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-except Exception as exc:  # pragma: no cover - PEFT installed on Colab
+except Exception as exc:
     raise RuntimeError(
         "PEFT is required for QLoRA. Install with `pip install peft`."
     ) from exc
 
 
+# -----------------------------
+# Config classes
+# -----------------------------
 @dataclass
 class LoRAArgs:
     r: int = 8
@@ -57,48 +62,37 @@ def _build_bnb_config() -> BitsAndBytesConfig:
 
 
 def _tokenize_function(examples, tokenizer, block_size: int, text_key: str):
-    out = tokenizer(examples[text_key], truncation=True, max_length=block_size)
-    return out
+    return tokenizer(examples[text_key], truncation=True, max_length=block_size)
 
 
+# -----------------------------
+# Main training routine
+# -----------------------------
 def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Train GPT-2 Small with QLoRA")
     parser.add_argument("--model_name", type=str, default="gpt2")
     parser.add_argument("--train_file", type=str, required=True)
     parser.add_argument("--val_file", type=str, default=None)
     parser.add_argument("--output_dir", type=str, required=True)
-    # Data format
-    parser.add_argument(
-        "--data_format",
-        type=str,
-        choices=["text", "jsonl"],
-        default="text",
-        help="Input format: plain text or JSONL (json)",
-    )
-    parser.add_argument(
-        "--text_key",
-        type=str,
-        default="text",
-        help="Field name containing text when using JSONL",
-    )
+
+    # Data
+    parser.add_argument("--data_format", choices=["text", "jsonl"], default="text")
+    parser.add_argument("--text_key", type=str, default="text")
+    parser.add_argument("--block_size", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=2)
 
     # LoRA
     parser.add_argument("--lora_r", type=int, default=8)
     parser.add_argument("--lora_alpha", type=int, default=16)
     parser.add_argument("--lora_dropout", type=float, default=0.05)
 
-    # Data
-    parser.add_argument("--block_size", type=int, default=128)
-    parser.add_argument("--batch_size", type=int, default=2)
-
-    # Train
+    # Training
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gradient_accumulation", type=int, default=1)
 
     args = parser.parse_args(argv)
-
     torch.manual_seed(args.seed)
 
     output_dir = Path(args.output_dir)
@@ -113,6 +107,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     data_files = {"train": args.train_file}
     if args.val_file:
         data_files["validation"] = args.val_file
+
     if args.data_format == "jsonl":
         ds = load_dataset("json", data_files=data_files)
         remove_cols = [args.text_key]
@@ -128,7 +123,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         remove_columns=remove_cols,
     )
 
-    # Model (4-bit) + PEFT
+    # Model + QLoRA prep
     bnb_config = _build_bnb_config()
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
@@ -147,8 +142,16 @@ def main(argv: Optional[list[str]] = None) -> None:
     )
     model = get_peft_model(model, lora_cfg)
 
-    # Trainer
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    # -----------------------------
+    # TrainingArguments — version-safe
+    # -----------------------------
+    kwargs = {}
+    sig = inspect.signature(TrainingArguments.__init__)
+    if "evaluation_strategy" in sig.parameters:
+        kwargs["evaluation_strategy"] = "epoch" if "validation" in tokenized else "no"
+    elif "eval_strategy" in sig.parameters:
+        kwargs["eval_strategy"] = "epoch" if "validation" in tokenized else "no"
+
     train_args = TrainingArguments(
         output_dir=str(output_dir),
         num_train_epochs=args.epochs,
@@ -159,12 +162,14 @@ def main(argv: Optional[list[str]] = None) -> None:
         lr_scheduler_type="cosine",
         warmup_ratio=0.03,
         logging_steps=10,
-        evaluation_strategy="epoch" if "validation" in tokenized else "no",
         save_strategy="epoch",
         report_to="none",
         bf16=torch.cuda.is_available(),
+        **kwargs,
     )
 
+    # Trainer
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     trainer = Trainer(
         model=model,
         args=train_args,
@@ -176,11 +181,11 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     trainer.train()
 
-    # Save PEFT adapter
+    # Save PEFT adapter + tokenizer
     model.save_pretrained(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
 
-    # Save summary
+    # Save training summary
     summary = {
         "model_name": args.model_name,
         "output_dir": str(output_dir),
@@ -194,11 +199,12 @@ def main(argv: Optional[list[str]] = None) -> None:
         "epochs": args.epochs,
         "learning_rate": args.lr,
     }
+
     (output_dir / "training_summary.json").write_text(
         json.dumps(summary, indent=2), encoding="utf-8"
     )
 
-    print(f"Saved adapter and summary to {output_dir}")
+    print(f"✅ Training complete. Adapter and summary saved to: {output_dir}")
 
 
 if __name__ == "__main__":
