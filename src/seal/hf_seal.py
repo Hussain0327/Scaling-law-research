@@ -149,7 +149,9 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
                 base = prepare_model_for_kbit_training(base)
             else:
                 # Fallback to standard precision LoRA if 4-bit is unavailable
-                torch_dtype = torch.float16 if device.type in {"cuda", "mps"} else torch.float32
+                torch_dtype = (
+                    torch.float16 if device.type in {"cuda", "mps"} else torch.float32
+                )
                 base = AutoModelForCausalLM.from_pretrained(
                     args.model_name,
                     torch_dtype=torch_dtype,
