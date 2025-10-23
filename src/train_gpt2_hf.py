@@ -1,15 +1,15 @@
+import inspect
 import os
 from pathlib import Path
 
 from datasets import load_dataset
 from transformers import (
+    DataCollatorForLanguageModeling,
     GPT2LMHeadModel,
     GPT2Tokenizer,
     Trainer,
     TrainingArguments,
-    DataCollatorForLanguageModeling,
 )
-import inspect
 
 
 def main():
