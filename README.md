@@ -1,67 +1,4 @@
-### Quick checklist of what I’ll do here
-
-1. Judge your current markdown for clarity and impact.
-2. Point out the main problems (duplication, rough edges, stray junk).
-3. Give you a **clean, final** `PROJECT_PLAN.md` that merges everything coherently.
-4. Make sure it is directly usable in a GitHub repo with no edits.
-5. End with one concrete next step for you.
-
----
-
-## Is your current version “good”?
-
-Conceptually: yes.
-Structurally: messy.
-
-You have two overlapping documents mashed together:
-
-* A high level **“Mechanistic Interpretability Research Project Guide”**
-* A deep, stepwise **“Mechanistic Interpretability Project Plan / Circuit Discovery in Small LMs”**
-
-Plus:
-
-* Some duplicated promises (two “checklist of what you will get” sections)
-* A stray `::contentReference[oaicite:0]{index=0}` artifact
-* Mixed citation styles and some placeholder reference text
-
-So the ideas are strong, but you want **one clean, focused file** that:
-
-* Starts with the big picture
-* Specifies one concrete research problem
-* Gives a step by step execution plan and timeline
-* Ends with a clear checklist
-
-I merged and cleaned everything for you below.
-
----
-
-## Final `PROJECT_PLAN.md` (drop this into your repo)
-
-````markdown
-# Mechanistic Interpretability Project Plan  
-## Circuit Discovery in Small Language Models
-
-Author: Raja Hussain  
-Status: Draft  
-Last updated: TODO
-
----
-
-## 0. Quick Summary
-
-This project is a mechanistic interpretability study on small and mid-scale open models such as GPT-2, Qwen-3B, and DeepSeek-VL2. The core objective is to:
-
-- Identify a specific computation (for example two digit addition) inside a transformer model  
-- Localize it to a small set of layers and heads or features  
-- Demonstrate **causal** evidence via ablations and activation patching  
-- Compare behavior across at least one additional model  
-- Produce a publishable report and a clean, reproducible GitHub repo
-
-All experiments should be runnable on a laptop plus Google Colab.
-
----
-
-## 1. Project Overview and Motivation
+## 1. Project Overview 
 
 Mechanistic interpretability is about reverse-engineering neural networks and understanding how specific neurons, heads, or circuits implement computations. For AGI relevance, this matters because:
 
@@ -564,6 +501,5 @@ By the end you should have:
 * Sparse autoencoder tooling (SAE-Lens)
 * “Awesome Mechanistic Interpretability” style paper lists and repos
 
-Keep this file updated as you refine the problem or add models.
 
 
