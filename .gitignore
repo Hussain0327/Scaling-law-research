@@ -1,0 +1,31 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+*.ipynb
+
+# MacOS
+.DS_Store
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+
+# PyTorch / model artifacts (if you start saving them)
+*.pt
+*.pth
+
+# Large local data or scratch outputs (keep small, clean samples only)
+data/raw/*.tmp
+data/intermediate/
+cache/
